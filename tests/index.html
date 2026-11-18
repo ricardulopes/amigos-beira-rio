@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Testes — Pelada Organizada</title>
+<style>
+  body { font: 14px/1.4 system-ui, sans-serif; margin: 16px; background: #fff; color: #111; }
+  h1 { font-size: 18px; }
+  .ok { color: #0a7a2f; } .fail { color: #b00020; }
+  li { margin: 2px 0; } pre { white-space: pre-wrap; font-size: 12px; color: #b00020; margin: 2px 0 8px 16px; }
+  #summary { font-weight: 700; font-size: 16px; }
+</style>
+</head>
+<body>
+<h1>Testes automatizados</h1>
+<div id="summary">Executando…</div>
+<div id="out"></div>
+<script type="module">
+  import { runAll } from './harness.js';
+  import './rules.test.js';
+  import './operations.test.js';
+  import './draw.test.js';
+  import './domain.test.js';
+  import './admin.test.js';
+  import './vests.test.js';
+  import './isolation.test.js';
+  const results = await runAll();
+  window.__results = results;
+  const fails = results.filter((r) => !r.ok);
+  document.getElementById('summary').innerHTML =
+    `<span class="${fails.length ? 'fail' : 'ok'}">${results.length - fails.length}/${results.length} testes passaram</span>`;
+  let html = '';
+  let suite = null;
+  for (const r of results) {
+    if (r.suite !== suite) { if (suite !== null) html += '</ul>'; suite = r.suite; html += `<h3>${suite}</h3><ul>`; }
+    html += `<li class="${r.ok ? 'ok' : 'fail'}">${r.ok ? '✔' : '✘'} ${r.name} <small>(${r.ms.toFixed(0)} ms)</small></li>`;
+    if (!r.ok) html += `<pre>${r.error}</pre>`;
+  }
+  document.getElementById('out').innerHTML = html + '</ul>';
+</script>
+</body>
+</html>

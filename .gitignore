@@ -1,0 +1,9 @@
+# Configurações locais do Claude
+.claude/
+
+# Arquivos do sistema e de editores
+Thumbs.db
+desktop.ini
+.DS_Store
+*.tmp
+~$*
