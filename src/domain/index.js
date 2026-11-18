@@ -44,4 +44,4 @@ export { shareText } from './share.js';
 export {
   PIN_RULES, ADMIN_ACTIONS, requiresAdmin, validatePinFormat, createPinRecord, definePin, pinLockSeconds, checkPin, adminExpiry, isAdminActive, sha256,
 } from './admin.js';
-export { parseRosterLine, parseRoster, planRosterImport, applyRosterImport, rosterPlanSummary, rosterText } from './roster.js';
+export { parseRosterLine, parseRoster, planRosterImport, applyRosterImport, rosterPlanSummary, rosterText, seedPlayers } from './roster.js';

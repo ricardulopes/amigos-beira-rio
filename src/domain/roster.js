@@ -167,6 +167,16 @@ export function applyRosterImport(players, plan) {
   return [...players.filter((p) => !removed.has(p.id)).map((p) => updated.get(p.id) || p), ...plan.create];
 }
 
+/**
+ * Cadastro inicial a partir de uma lista em texto (RN-112): todos os atletas viram jogadores novos.
+ * Lança erro se a lista tiver qualquer linha inválida, para nunca semear um cadastro pela metade.
+ */
+export function seedPlayers(text) {
+  const plan = planRosterImport([], parseRoster(text), { mode: 'replace' });
+  if (plan.errors.length) throw new Error(`Lista inicial com erro: ${plan.errors.map((e) => `linha ${e.lineNo} — ${e.message}`).join('; ')}`);
+  return applyRosterImport([], plan);
+}
+
 /** Cadastro atual no mesmo formato aceito pela importação ("Nome; 2,5; D,M"), em ordem alfabética. */
 export function rosterText(players) {
   return [...players]

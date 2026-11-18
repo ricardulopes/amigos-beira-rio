@@ -61,7 +61,9 @@ presença, atrasados já cadastrados, resultados e ajustes de equipes ficam livr
 `Nome; estrelas; posições` (ex.: `Branco; 2,5; D`, `Fabio; 2; G`, `Leo Baiano; X` para excluir).
 **Conferir lista** mostra o que será criado/atualizado/excluído e os erros por linha; **Aplicar**
 grava. "Mesclar" mantém o resto do cadastro; "Substituir" exclui quem não estiver na lista.
-Modelo da lista do grupo: `dados/lista-oficial.txt`.
+**Lista do grupo já vem no app:** na primeira vez que o app é aberto num aparelho, o cadastro já começa
+com os 78 atletas da lista oficial, sem precisar importar. Para mudar a lista que vem de fábrica, edite
+`src/data/lista-oficial.js`. Aparelhos que já têm dados não são alterados.
 
 ## Arquitetura
 

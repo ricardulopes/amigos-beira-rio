@@ -140,7 +140,7 @@ tests/         harness próprio + suítes (*.test.js) + runner de navegador e de
 ## Testes (obrigatório)
 
 - Toda mudança em regra de negócio exige teste novo ou atualizado em `tests/` **antes** de considerar
-  pronto, e toda a suíte precisa passar (hoje: 117 testes). Testes do domínio importam de
+  pronto, e toda a suíte precisa passar (hoje: 119 testes). Testes do domínio importam de
   `../src/domain/index.js`, nunca da interface.
 - Regras de empate/rodízio: testar o **estado interno** (field, queue, permanence, stats, composição
   das equipes), não só textos. Use `mkSession(sizes, {gks, config, stars})` de `tests/helpers.js` para

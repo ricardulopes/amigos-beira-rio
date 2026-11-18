@@ -2,8 +2,16 @@
 import { suite, test, assert } from './harness.js';
 import {
   sha256, validatePinFormat, createPinRecord, definePin, checkPin, pinLockSeconds, requiresAdmin, adminExpiry, isAdminActive, PIN_RULES,
-  parseRosterLine, parseRoster, planRosterImport, applyRosterImport, rosterPlanSummary, rosterText, validatePlayer,
+  parseRosterLine, parseRoster, planRosterImport, applyRosterImport, rosterPlanSummary, rosterText, validatePlayer, seedPlayers,
 } from '../src/domain/index.js';
+import { OFFICIAL_ROSTER } from '../src/data/lista-oficial.js';
+import { createStore } from '../src/storage/storage.js';
+
+/** Armazenamento falso em memória (não toca no localStorage do navegador). */
+function memBackend() {
+  const m = new Map();
+  return { getItem: (k) => m.get(k) ?? null, setItem: (k, v) => m.set(k, String(v)), removeItem: (k) => m.delete(k), m };
+}
 
 const SALT = 'sal-de-teste-123';
 
@@ -74,6 +82,34 @@ suite('Modo administrador (PIN)', () => {
     assert.ok(isAdminActive(until, 14 * 60 * 1000));
     assert.ok(!isAdminActive(until, 15 * 60 * 1000 + 1));
     assert.ok(!isAdminActive(undefined, 0));
+  });
+});
+
+suite('Lista oficial embutida (RN-112)', () => {
+  test('A lista oficial é lida sem erros: 78 atletas, 3 goleiros, valores conferidos', () => {
+    const players = seedPlayers(OFFICIAL_ROSTER);
+    assert.equal(players.length, 78);
+    assert.deepEqual(players.filter((p) => p.type === 'gk').map((p) => p.name).sort(), ['Fabio', 'Humberto', 'Jarbas']);
+    const by = Object.fromEntries(players.map((p) => [p.name, p]));
+    assert.equal(by.Jarbas.stars, 2);
+    assert.equal(by.Fabio.stars, 1.5);
+    assert.equal(by.Wagner.stars, 2);
+    assert.deepEqual(by.Ricardo.positions, ['D', 'M', 'A']);
+    assert.ok(by.Udsnei && by.Van && by.Vagner && by.Kauan && by.Cantor);
+    assert.equal(new Set(players.map((p) => p.id)).size, 78, 'ids únicos');
+    assert.throws(() => seedPlayers('Fulano; 9; M'), /Lista inicial com erro/);
+  });
+
+  test('Primeira abertura semeia o cadastro e salva; depois não semeia de novo', () => {
+    const be = memBackend();
+    const db1 = createStore(be).load();
+    assert.equal(db1.players.length, 78);
+    assert.ok(be.getItem('pelada.db'), 'gravado na primeira abertura');
+    const db2 = createStore(be).load();
+    assert.deepEqual(db2.players.map((p) => p.id), db1.players.map((p) => p.id), 'mesmos ids ao reabrir');
+    const store = createStore(be);
+    store.save({ ...db2, players: [] }); // como "Apagar todos os dados"
+    assert.equal(createStore(be).load().players.length, 0, 'banco vazio salvo continua vazio');
   });
 });
 

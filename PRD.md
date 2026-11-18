@@ -75,9 +75,12 @@ cadastro dos jogadores até o encerramento da sequência de jogos:
   mudança, ignorados e erros por linha) → **Aplicar** (confirmação extra quando houver exclusões). No
   modo mesclar, linhas com erro são ignoradas e as válidas são aplicadas. "Carregar cadastro atual"
   gera a lista no mesmo formato (ida e volta sem alterações). Exige PIN de administrador (RN-99).
-- Lista oficial do grupo: `dados/lista-oficial.txt`, distribuída junto com o app. O botão "Usar lista
-  oficial do grupo" preenche o campo com ela e seleciona "Substituir"; ainda é preciso conferir e aplicar.
-  Nada é carregado sozinho: os dados de cada aparelho só mudam por ação do administrador.
+- **RN-112** Lista oficial do grupo **embutida no app** (`src/data/lista-oficial.js`, 78 atletas). Na
+  **primeira abertura** num aparelho (nada salvo ainda), o cadastro já começa com ela, sem importação
+  manual, e é salvo na hora (ids fixos). Aparelho que já tem dados não é alterado. Depois de "Apagar
+  todos os dados" o cadastro fica vazio (a lista não volta sozinha). O botão "Usar lista oficial do
+  grupo" na importação preenche o campo com a mesma lista e seleciona "Substituir"; ainda é preciso
+  conferir e aplicar. Lista com qualquer linha inválida não é semeada (testado).
 
 ---
 
@@ -524,7 +527,7 @@ completam o 5º time; os dois seguintes abrem o 6º; o quinto atrasado entra no 
 
 ---
 
-## 18. Testes automatizados (cobertura atual: 117 testes)
+## 18. Testes automatizados (cobertura atual: 119 testes)
 
 Executar em `tests/index.html` (navegador) ou `node tests/run-node.mjs`.
 

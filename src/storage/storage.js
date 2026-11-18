@@ -1,5 +1,6 @@
 // Persistência local (localStorage) com esquema versionado, desfazer, backup e restauração.
-import { DEFAULT_CONFIG, validate, validatePlayer, ensureVests } from '../domain/index.js';
+import { DEFAULT_CONFIG, validate, validatePlayer, ensureVests, seedPlayers } from '../domain/index.js';
+import { OFFICIAL_ROSTER } from '../data/lista-oficial.js';
 
 export const SCHEMA = 2;
 const KEY = 'pelada.db';
@@ -31,10 +32,30 @@ export function createStore(backend = globalThis.localStorage) {
     return out;
   }
 
+  /**
+   * Primeira abertura neste aparelho (nada salvo ainda): o cadastro já começa com a lista oficial (RN-112).
+   * Salva na hora para os ids dos jogadores ficarem fixos. "Apagar todos os dados" grava um banco vazio,
+   * então a lista não volta sozinha depois disso.
+   */
+  function firstRunDB() {
+    const db = emptyDB();
+    try {
+      db.players = seedPlayers(OFFICIAL_ROSTER);
+    } catch (e) {
+      console.error('Falha ao montar a lista oficial', e);
+    }
+    try {
+      save(db);
+    } catch {
+      // sem armazenamento disponível: segue só em memória
+    }
+    return db;
+  }
+
   function load() {
     try {
       const raw = ls.getItem(KEY);
-      if (!raw) return emptyDB();
+      if (!raw) return firstRunDB();
       return migrate(JSON.parse(raw));
     } catch (e) {
       console.error('Falha ao ler dados', e);

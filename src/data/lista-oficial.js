@@ -1,12 +1,12 @@
-# Lista oficial de atletas — para "Jogadores → Importar lista de atletas" (modo Mesclar ou Substituir).
-# Formato: Nome; estrelas; posições
-#   estrelas: 1, 1,5, 2, 2,5 ou 3
-#   posições: D, M, A (uma ou mais, separadas por vírgula) · G = goleiro · X = excluir do cadastro
-# Origem: lista enviada pelo dono (exportada do app Time Equilibrado). Os 21 marcados com X (não jogam
-# mais) foram deixados de fora: Clebinho, Emerson, Henrico, Gabriel Wesley, Guilherme, Guto, Jadson,
-# Jonathan, Juscelino, Kaleb, Klebinho, Léo, Mara, Marques, Neguim, Obina, Piriguete, Rony, Tulio,
-# Vanbaster, Vitor.
-# 78 atletas: 75 de linha + 3 goleiros.
+// Lista oficial de atletas do grupo, embutida no app (RN-112).
+// É o cadastro inicial de quem abre o app pela primeira vez (armazenamento vazio) e também o texto do
+// botão "⭐ Usar lista oficial do grupo" na importação em lote.
+// Formato: Nome; estrelas; posições — estrelas 1 a 3 (de 0,5 em 0,5); posições D, M, A; G = goleiro.
+// Origem: lista enviada pelo dono (exportada do app Time Equilibrado). Os 21 marcados com X (não jogam
+// mais) ficaram de fora: Clebinho, Emerson, Henrico, Gabriel Wesley, Guilherme, Guto, Jadson, Jonathan,
+// Juscelino, Kaleb, Klebinho, Léo, Mara, Marques, Neguim, Obina, Piriguete, Rony, Tulio, Vanbaster, Vitor.
+// 78 atletas: 75 de linha + 3 goleiros. Para atualizar, edite as linhas abaixo.
+export const OFFICIAL_ROSTER = `
 Alves; 2; D,M
 Ari; 2,5; D,M
 Balão; 2,5; M,A
@@ -85,3 +85,4 @@ Wagner; 2; D,M
 Waguim; 2; D,M
 Wender; 2,5; D,A
 Wesley; 1,5; D
+`.trim();

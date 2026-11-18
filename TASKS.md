@@ -21,8 +21,8 @@ técnicos, no [CLAUDE.md](CLAUDE.md).
       atrasados, retiradas, ajustes, avisos, estatísticas, compartilhamento) com API única em `index.js`.
 - [x] Teste de isolamento: o domínio não usa DOM/navegador/armazenamento e a interface só o acessa por `index.js`.
 - [x] Servidor local em PowerShell (`tools/serve.ps1`) e geração de ícones (`tools/make-icons.ps1`).
-- [x] Documentação: README.md, PRD.md (107 regras), CLAUDE.md, TASKS.md.
-- [x] 106 testes automatizados passando (navegador e Node).
+- [x] Documentação: README.md, PRD.md (112 regras), CLAUDE.md, TASKS.md.
+- [x] 119 testes automatizados passando (navegador e Node).
 
 ### Cadastro (RN-01 a RN-07)
 - [x] Cadastro com nome, estrelas (1 a 3, de 0,5 em 0,5), tipo (linha/goleiro) e posições (D, M, A).
@@ -33,8 +33,8 @@ técnicos, no [CLAUDE.md](CLAUDE.md).
 - [x] Modo administrador por PIN (RN-98 a RN-102): cadastro, estrelas, posições, exclusões e importações
       protegidos; rotina da pelada livre.
 - [x] Importação da base em lote (RN-103 a RN-107): colar/abrir lista, conferir, mesclar ou substituir, X exclui.
-- [x] Lista oficial do grupo pronta em `dados/lista-oficial.txt` (78 atletas, sem os 21 marcados com X).
-- [ ] Importar a lista no celular do dono (Jogadores → Importar lista de atletas).
+- [x] Lista oficial do grupo embutida no app (`src/data/lista-oficial.js`, 78 atletas, sem os 21 marcados com X):
+      já aparece na primeira abertura, sem importação manual (RN-112).
 
 ### Seleção e sorteio (RN-08 a RN-41)
 - [x] Seleção de presentes com contadores, plano de equipes, aviso de goleiros e horário da tolerância.

@@ -1,6 +1,6 @@
 // Service worker: funciona offline (campo de futebol sem sinal).
 // Estratégia: rede primeiro para o app (pega atualizações), cache como reserva.
-const CACHE = 'pelada-v6';
+const CACHE = 'pelada-v7';
 const DOMAIN = [
   'index', 'constants', 'stars', 'players', 'tactics', 'rng', 'draw', 'setup', 'session',
   'tieRules', 'rotation', 'arrivals', 'removals', 'adjustments', 'balance', 'stats', 'share',
@@ -11,7 +11,7 @@ const ASSETS = [
   './src/ui/app.js', './src/ui/state.js', './src/ui/views.js', './src/ui/modals.js', './src/ui/dom.js',
   './src/storage/storage.js',
   ...DOMAIN.map((m) => `./src/domain/${m}.js`),
-  './dados/lista-oficial.txt',
+  './src/data/lista-oficial.js',
   './icons/icon-192.png', './icons/icon-512.png', './icons/icon-maskable-512.png',
   './icons/apple-touch-180.png', './icons/favicon-32.png', './img/escudo-abr.png',
 ];

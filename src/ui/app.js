@@ -10,6 +10,7 @@ import {
   transferPlayers, movePlayerInOrder, swapPlayers, moveGoalkeeper, setPermanence, RuleError,
   shareText, requiresAdmin, adminExpiry, definePin, checkPin, parseRoster, planRosterImport, applyRosterImport, rosterPlanSummary, rosterText,
 } from '../domain/index.js';
+import { OFFICIAL_ROSTER } from '../data/lista-oficial.js';
 
 // ------------------------------------------------------------------ renderização
 
@@ -158,20 +159,13 @@ const actions = {
 
   // ---------- importação em lote (RN-103 a RN-107)
   'open-roster': () => withAdmin('roster-import', () => openModal('roster', { text: '', mode: 'merge', plan: null })),
-  // Lista oficial do grupo, distribuída junto com o app (dados/lista-oficial.txt). Só preenche o campo:
+  // Lista oficial do grupo, embutida no app (src/data/lista-oficial.js). Só preenche o campo:
   // o usuário ainda confere e aplica (RN-107).
-  'roster-official': async () => {
-    try {
-      const res = await fetch('dados/lista-oficial.txt', { cache: 'no-cache' });
-      if (!res.ok) throw new Error(String(res.status));
-      if (!app.ui.modal) return;
-      app.ui.modal.text = await res.text();
-      app.ui.modal.mode = 'replace';
-      app.ui.modal.plan = null;
-      render();
-    } catch {
-      toast('Não foi possível carregar a lista oficial.', 'error');
-    }
+  'roster-official': () => {
+    app.ui.modal.text = OFFICIAL_ROSTER;
+    app.ui.modal.mode = 'replace';
+    app.ui.modal.plan = null;
+    render();
   },
   'roster-current': () => {
     app.ui.modal.text = rosterText(app.db.players);
