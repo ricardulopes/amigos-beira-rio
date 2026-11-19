@@ -74,13 +74,15 @@ cadastro dos jogadores até o encerramento da sequência de jogos:
 - **RN-107** Fluxo: colar/abrir → **Conferir lista** (prévia com novos, atualizados, excluídos, sem
   mudança, ignorados e erros por linha) → **Aplicar** (confirmação extra quando houver exclusões). No
   modo mesclar, linhas com erro são ignoradas e as válidas são aplicadas. "Carregar cadastro atual"
-  gera a lista no mesmo formato (ida e volta sem alterações). Exige PIN de administrador (RN-99).
+  gera a lista no mesmo formato (ida e volta sem alterações). Exige o PIN mestre (RN-114).
 - **RN-112** Lista oficial do grupo **embutida no app** (`src/data/lista-oficial.js`, 78 atletas). Na
   **primeira abertura** num aparelho (nada salvo ainda), o cadastro já começa com ela, sem importação
   manual, e é salvo na hora (ids fixos). Aparelho que já tem dados não é alterado. Depois de "Apagar
   todos os dados" o cadastro fica vazio (a lista não volta sozinha). O botão "Usar lista oficial do
   grupo" na importação preenche o campo com a mesma lista e seleciona "Substituir"; ainda é preciso
-  conferir e aplicar. Lista com qualquer linha inválida não é semeada (testado).
+  conferir e aplicar. Lista com qualquer linha inválida não é semeada (testado). Com o banco unificado
+  (RN-113), a mesma lista também é carregada no Supabase pelo `supabase/schema.sql`; a cópia embutida
+  serve de reserva enquanto o aparelho ainda não baixou os dados da nuvem.
 
 ---
 
@@ -480,17 +482,23 @@ completam o 5º time; os dois seguintes abrem o 6º; o quinto atrasado entra no 
 
 ## 16. Armazenamento, backup e restauração
 
-- **RN-93** Os dados ficam no aparelho (localStorage), com esquema versionado e migração. O app pede
-  armazenamento persistente ao navegador.
+- **RN-93** Os dados oficiais ficam no **banco unificado na nuvem** (seção 16.2). Cada aparelho guarda
+  uma cópia local (localStorage, esquema versionado e migração) para abrir rápido e funcionar sem sinal.
+  O app pede armazenamento persistente ao navegador.
 - **RN-94** Exportar backup (arquivo JSON) e enviar backup (compartilhamento de arquivo).
 - **RN-95** Importar backup: valida o arquivo (jogadores pela mesma validação do cadastro; peladas pela
   validação de integridade), mostra o resumo, pede confirmação, substitui os dados e guarda uma cópia
   dos dados anteriores.
-- **RN-96** "Apagar todos os dados" com confirmação (mantém apenas as configurações).
+- **RN-96** "Limpar dados deste aparelho" com confirmação: apaga só a cópia local (e o acesso de admin
+  do aparelho) e baixa tudo de novo da nuvem. Nada é apagado para os outros. Avisa se houver alterações
+  ainda não enviadas. Importar backup (RN-95) substitui os dados na nuvem, para todos (só admin).
 - **RN-97** Configurações padrão em Ajustes: nome do grupo, tolerância, N, goleiros, goleiro obrigatório,
   par ou ímpar no 1º jogo.
 
-### 16.1 Modo administrador por PIN (`src/domain/admin.js`)
+### 16.1 Modo administrador por PIN no aparelho — SUBSTITUÍDO (histórico)
+
+> **Substituído em 2026-11-19 pela seção 16.2 (RN-113 a RN-117).** O PIN criado em cada aparelho foi
+> removido (o registro antigo `pelada.admin` é apagado ao abrir o app). Texto mantido só como histórico.
 
 - **RN-98** Autenticação leve, só no aparelho (sem servidor): PIN de **4 a 8 números**. Guarda-se apenas
   sal aleatório + hash SHA-256 (`pelada.admin` no localStorage), nunca o PIN. O primeiro uso de uma
@@ -509,6 +517,47 @@ completam o 5º time; os dois seguintes abrem o 6º; o quinto atrasado entra no 
   **Limite conhecido:** é uma proteção contra alterações acidentais ou casuais, não segurança forte —
   quem tem o aparelho e conhece o navegador consegue contorná-la (tudo roda localmente).
 
+### 16.2 Banco unificado (Supabase) e PIN mestre (`supabase/schema.sql`, `src/cloud/`, `src/domain/admin.js`)
+
+Decisões do dono (2026-11-19): código por jogador para a própria posição; sem sinal, o admin continua
+e o app envia depois; a nuvem começa só com os 78 atletas da lista oficial (peladas antigas ficam no
+backup local).
+
+- **RN-113 — Banco unificado e PIN mestre.** Jogadores, peladas (atual e histórico, com equipes,
+  campo, fila, coletes, jogos e registro), seleção de presentes, pelada ativa e ajustes ficam no
+  Supabase, iguais para todos os aparelhos. Há **um único PIN mestre** (4 a 8 números) para os
+  administradores da ABR, definido no próprio Supabase (`select set_master_pin('…')` no SQL Editor) e
+  guardado só como hash bcrypt no servidor. Ninguém cria PIN no aparelho. O login (precisa de internet)
+  devolve um acesso válido por **12 horas** naquele aparelho, inclusive sem sinal. 5 erros seguidos
+  bloqueiam por 30 s, dobrando até 5 min. "Sair do modo administrador" encerra o acesso; trocar o PIN
+  derruba o acesso dos outros aparelhos.
+- **RN-114 — Quem pode o quê.** Sem PIN qualquer pessoa **vê todas as abas**, compartilha, exporta
+  backup e **altera só a própria posição** (RN-116). Todo o resto exige o PIN mestre: selecionar
+  presentes e sortear, iniciar, resultados, atrasados, retiradas, transferências, ordem, trocas,
+  goleiros, permanência, desfazer, encerrar, cadastro, estrelas, posições de qualquer jogador, exclusões,
+  importações, ajustes, excluir histórico e trocar o PIN. A regra vale no servidor: o banco não aceita
+  gravação direta (RLS só de leitura) e as funções de gravação conferem o acesso de admin.
+- **RN-115 — Sem sinal e conflitos.** O aparelho mantém uma cópia local. Gravação de admin vai para
+  uma fila e sobe assim que houver internet (tentativas a cada 20 s e ao voltar o sinal); a barra no
+  topo mostra "sem internet" e quantas alterações aguardam. Cada pelada tem número de versão: se dois
+  admins alteraram a mesma pelada sem sinal, **vale a de quem enviou primeiro**; o outro é avisado e a
+  versão dele fica guardada no aparelho (`pelada.conflito.<id>`). Jogadores e ajustes: vale a última
+  gravação.
+- **RN-116 — Própria posição com código.** Cada jogador de linha pode receber de um admin um **código de
+  4 números** (gerado no servidor; mostrado uma vez; gerar outro invalida o anterior). Tocando no próprio
+  nome em Jogadores, o jogador escolhe Defesa/Meio/Ataque (ao menos uma) e digita o código; o servidor
+  confere e grava **somente as posições** daquele jogador, para todos. Estrelas, nome e tipo não mudam
+  por esse caminho. 5 códigos errados bloqueiam o jogador por 10 min. Precisa de internet. O aparelho
+  lembra o código depois do primeiro acerto. Peladas já sorteadas não mudam (snapshot, RN-07).
+- **RN-117 — Tempo real.** Mudanças feitas por qualquer admin (ou posição alterada por um jogador)
+  aparecem nos outros aparelhos conectados na hora (Supabase Realtime), sem recarregar. Ao reconectar,
+  o app baixa tudo de novo para não perder nada. Mudança pendente deste aparelho nunca é sobrescrita
+  pelo que chega.
+
+**Chave do Supabase:** o app usa só a chave **publicável** (`src/cloud/config.js`), que permite ler e
+chamar as funções protegidas. A chave secreta nunca vai para o app (verificado em teste). Como não há
+etapa de build, não há variáveis de ambiente no Vercel.
+
 ---
 
 ## 17. Requisitos não funcionais
@@ -522,12 +571,13 @@ completam o 5º time; os dois seguintes abrem o 6º; o quinto atrasado entra no 
   `#F4F6F9` com cartões brancos e bordas sutis.
 - PWA instalável (manifesto + ícones + service worker) e **funciona offline**. A instalação no Android
   exige hospedagem HTTPS.
-- Sem dependências externas e sem etapa de build.
+- Sem etapa de build. Única dependência: `@supabase/supabase-js` 2.118.0, guardada no próprio app
+  (`vendor/supabase.js`, sem CDN) para funcionar offline.
 - Sorteio de um grupo típico (20–30 jogadores) em cerca de 100 ms.
 
 ---
 
-## 18. Testes automatizados (cobertura atual: 119 testes)
+## 18. Testes automatizados (cobertura atual: 124 testes)
 
 Executar em `tests/index.html` (navegador) ou `node tests/run-node.mjs`.
 
@@ -537,9 +587,13 @@ Executar em `tests/index.html` (navegador) ou `node tests/run-node.mjs`.
 | `tests/operations.test.js` | Atrasados (exemplo dos 23), goleiro atrasado, aviso de desequilíbrio, retirada com reposição em cascata (campo, fila, último da fila, sem fila, equipe esvaziada, goleiro, permanência e rodízio depois da retirada), transferência, ordem, goleiros, integridade, transação, desfazer, estatísticas, cadastro, snapshot, backup, texto de compartilhamento |
 | `tests/draw.test.js` | Atribuição de função, planejamento de equipes, equilíbrio técnico e tático, equipe em formação, goleiros, ordem estratégica |
 | `tests/domain.test.js` | Cálculo de estrelas (validação, soma, média, mediana, amplitude, formatação), plano da pelada, aviso de goleiros, tolerância, limites, preparação do sorteio, dicas de empate, situação de vantagem, resumos |
-| `tests/admin.test.js` | SHA-256 (vetores oficiais), formato do PIN, hash com sal, acerto/erro, bloqueio por tentativas, operações protegidas × livres, expiração; leitura da lista em lote (formatos, "Felipe 2", erros), mesclar, X, jogador novo incompleto, ida e volta, substituir |
+| `tests/cloud.test.js` | Banco unificado: diferenças entre versões, fila offline (sem duplicar, versão-base da primeira mudança, exclusões), pelada nova, mescla com a nuvem com e sem pendências, conversão de linhas |
+| `tests/admin.test.js` | Formato do PIN mestre, ações livres × PIN mestre, código do jogador, validação da própria posição, acesso de 12 h; lista oficial embutida; leitura da lista em lote (formatos, "Felipe 2", erros), mesclar, X, jogador novo incompleto, ida e volta, substituir |
 | `tests/vests.test.js` | Coletes Amarelo/Azul: abertura, vitória de cada cor, sequência de vitórias, empate com saída dupla, empate com um só saindo, indicador neutro da PRO, prévia e explicação, WhatsApp, integridade (cores diferentes), migração de peladas antigas |
-| `tests/isolation.test.js` | O domínio não usa DOM/navegador/armazenamento, só importa a si mesmo, e interface/persistência só o acessam por `src/domain/index.js` |
+| `tests/isolation.test.js` | O domínio não usa DOM/navegador/armazenamento, só importa a si mesmo, e interface/persistência/nuvem só o acessam por `src/domain/index.js`; nenhuma chave secreta do Supabase no app |
+
+**Não coberto por teste automatizado:** o SQL (`supabase/schema.sql`) e a conversa real com o Supabase
+(login, gravação, Realtime, conflito entre dois aparelhos). Conferir manualmente depois de rodar o SQL.
 
 ---
 
@@ -547,6 +601,7 @@ Executar em `tests/index.html` (navegador) ou `node tests/run-node.mjs`.
 
 - **Não testado em um Android real** (só em emulação de tela no navegador).
 - Bloquear jogadores em equipes específicas antes de um novo sorteio (previsto no pedido original).
-- Sincronização entre aparelhos (hoje: exportar/importar backup).
+- Teste ponta a ponta com o Supabase real e com dois celulares (Realtime, fila offline, conflito).
+- Todas as peladas do histórico são baixadas a cada abertura; com muitos anos de histórico, paginar.
 - Divisão automática considera só a última equipe da fila (RN-49); a cascata de retirada (RN-76) garante
   que as vagas por lesão terminem nela.

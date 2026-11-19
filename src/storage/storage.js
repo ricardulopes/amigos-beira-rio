@@ -7,7 +7,7 @@ const KEY = 'pelada.db';
 const UNDO_PREFIX = 'pelada.undo.';
 const PREV_BACKUP = 'pelada.backup.anterior';
 const UNDO_LIMIT = 40;
-const ADMIN_KEY = 'pelada.admin';
+const OLD_ADMIN_KEY = 'pelada.admin'; // PIN local da versão antiga (removido)
 
 export const DEFAULT_SETTINGS = {
   ...DEFAULT_CONFIG,
@@ -128,20 +128,20 @@ export function createStore(backend = globalThis.localStorage) {
     return db;
   }
 
-  // Registro do PIN de administrador (sal + hash + tentativas). Fica fora do banco principal para não
-  // ir no backup nem ser trocado ao importar um (RN-102).
-  function loadAdmin() {
-    try {
-      const rec = JSON.parse(ls.getItem(ADMIN_KEY) || 'null');
-      return rec && rec.salt && rec.hash ? rec : null;
-    } catch {
-      return null;
-    }
-  }
-  function saveAdmin(rec) {
-    if (rec) ls.setItem(ADMIN_KEY, JSON.stringify(rec));
-    else ls.removeItem(ADMIN_KEY);
+  /** Apaga a cópia local deste aparelho (cache, fila, desfazer, acesso de admin). A nuvem não é tocada. */
+  function clearLocal() {
+    const keys = [];
+    for (let i = 0; i < (ls.length ?? 0); i++) keys.push(ls.key(i));
+    for (const k of keys) if (k && k.startsWith('pelada.')) ls.removeItem(k);
+    ls.removeItem(OLD_ADMIN_KEY);
   }
 
-  return { load, save, pushUndo, popUndo, readUndo, clearUndo, exportData, parseImport, importData, loadAdmin, saveAdmin };
+  // O PIN que cada aparelho criava (versão antiga) não vale mais: o PIN mestre fica no servidor (RN-113).
+  try {
+    ls.removeItem(OLD_ADMIN_KEY);
+  } catch {
+    /* sem armazenamento */
+  }
+
+  return { load, save, pushUndo, popUndo, readUndo, clearUndo, exportData, parseImport, importData, clearLocal };
 }

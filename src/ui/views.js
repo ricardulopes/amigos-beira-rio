@@ -1,9 +1,10 @@
 // Telas (somente apresentação). Ações são disparadas por data-act e tratadas em app.js.
-import { app, activeSession, setupState, adminActive, store } from './state.js';
+import { app, activeSession, setupState, adminActive } from './state.js';
 import { esc, fmt, stars, roleBadge, positionsBadges, icon, posBadge, vestIcon, vestTag } from './dom.js';
+import { cloud, adminUntil } from '../cloud/sync.js';
 import {
   filterPlayers, ROLE_NAMES, REMOVAL_REASONS, STAR_VALUES, LIMITS, planParticipation, toleranceInfo, defaultTitle as domainDefaultTitle,
-  ADMIN_ACTIONS, allTeamsInOrder, queueLabel, teamStats, isComplete, linePositions, playerStats, balanceSummary, gamesSummary, teamExitGroups, drawHint, advantageStatus,
+  ADMIN_ACTIONS, PUBLIC_ACTIONS, allTeamsInOrder, queueLabel, teamStats, isComplete, linePositions, playerStats, balanceSummary, gamesSummary, teamExitGroups, drawHint, advantageStatus,
   vestOf, vestName, incomingVest,
 } from '../domain/index.js';
 
@@ -17,7 +18,7 @@ export function header(title, { back = null, right = '' } = {}) {
     ${back ? `<button class="icon-btn" data-act="go" data-to="${back}" aria-label="Voltar">‹</button>` : `<img class="brand-logo" src="${CREST}" alt="Escudo ABR">`}
     <h1>${esc(title)}</h1>
     <div class="topbar-right">${right}</div>
-  </header>`;
+  </header>${cloudBar()}`;
 }
 
 export function tabbar() {
@@ -97,8 +98,8 @@ export function playersView() {
           ${stars(p.stars)}
         </li>`).join('') || '<li class="empty-row">Nenhum jogador encontrado.</li>'}
     </ul>
-    <button class="btn ghost wide" data-act="open-roster">⬆ Importar lista de atletas</button>
-    <p class="muted small center">${admin ? 'Modo administrador liberado: cadastro e edição permitidos.' : '🔒 Cadastrar, editar e excluir exigem o PIN de administrador.'}</p>
+    ${admin ? '<button class="btn ghost wide" data-act="open-roster">⬆ Importar lista de atletas</button>' : ''}
+    <p class="muted small center">${admin ? '🔓 Administrador: toque num jogador para editar ou gerar o código dele.' : '👆 Toque no seu nome para alterar as suas posições (com o seu código de jogador). Cadastro e estrelas: só administradores 🔒.'}</p>
   </main>`;
 }
 
@@ -423,6 +424,10 @@ export function settingsView() {
       <p class="muted small">Por padrão, a regra de saída dupla (PRO e RE completos) prevalece sobre o par ou ímpar do primeiro jogo.</p>
     </section>
     <section class="card">
+      <h3>Banco na nuvem</h3>
+      ${cloudSection()}
+    </section>
+    <section class="card">
       <h3>Modo administrador</h3>
       ${adminSection()}
     </section>
@@ -436,21 +441,46 @@ export function settingsView() {
     <section class="card">
       <h3>Sobre</h3>
       <p class="small">Regras de rodízio e empate centralizadas no motor de domínio. <a href="tests/index.html" target="_blank" rel="noopener">Executar testes automatizados</a>.</p>
-      <button class="btn danger-ghost wide" data-act="wipe">Apagar todos os dados</button>
+      <button class="btn danger-ghost wide" data-act="wipe">Limpar dados deste aparelho</button>
     </section>
   </main>`;
 }
 
 function adminSection() {
-  const hasPin = !!store.loadAdmin();
   const active = adminActive();
-  const until = active ? new Date(app.ui.adminUntil).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : '';
-  const status = !hasPin ? 'Nenhum PIN criado ainda. Ele será pedido na primeira ação protegida.' : active ? `🔓 Liberado até ${until} (renova a cada ação).` : '🔒 Bloqueado.';
+  const until = active ? new Date(adminUntil()).toLocaleString('pt-BR', { weekday: 'short', hour: '2-digit', minute: '2-digit' }) : '';
+  const status = active ? `🔓 Administrador neste aparelho até ${until}.` : '🔒 Você está como jogador: pode ver tudo e alterar só a sua posição.';
   return `<p class="small">${status}</p>
-    <p class="muted small">Exigem PIN: ${Object.values(ADMIN_ACTIONS).join('; ')}. Sorteio, presença, atrasados já cadastrados, resultados e ajustes de equipes são livres.</p>
-    <button class="btn wide" data-act="admin-toggle">${active ? 'Bloquear agora' : hasPin ? 'Entrar com PIN' : 'Criar PIN'}</button>
-    ${hasPin ? '<button class="btn wide" data-act="pin-change">Alterar PIN</button>' : ''}
-    <button class="btn wide" data-act="open-roster">⬆ Importar lista de atletas</button>`;
+    <p class="muted small">O PIN mestre é único para os administradores da ABR e fica guardado no servidor. Ele libera: ${Object.values(ADMIN_ACTIONS).join('; ')}.
+    Sem PIN: ${Object.values(PUBLIC_ACTIONS).join('; ')}.</p>
+    <button class="btn wide" data-act="admin-toggle">${active ? 'Sair do modo administrador' : 'Entrar com o PIN mestre'}</button>
+    ${active ? '<button class="btn wide" data-act="pin-change">Alterar PIN mestre</button><button class="btn wide" data-act="open-roster">⬆ Importar lista de atletas</button>' : ''}`;
+}
+
+function cloudSection() {
+  const c = cloud;
+  const when = (iso) => (iso ? new Date(iso).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : '—');
+  const line = !c.online
+    ? '📴 Sem internet: mostrando a última cópia baixada.'
+    : c.connected
+      ? `☁️ Conectado ao banco unificado${c.realtime ? ' · atualização em tempo real ligada' : ''}.`
+      : c.error
+        ? '⚠️ Sem dados da nuvem: usando a cópia deste aparelho.'
+        : '⏳ Conectando à nuvem…';
+  return `<p class="small">${line}</p>
+    <p class="muted small">Última sincronização: ${when(c.lastSync)} · Alterações aguardando envio: ${c.pending}</p>
+    ${c.error ? `<p class="alert error small">${esc(c.error)}</p>` : ''}
+    ${c.needLogin ? '<p class="alert warn small">Há alterações deste aparelho esperando para subir: entre com o PIN mestre para enviá-las.</p>' : ''}
+    <button class="btn wide" data-act="cloud-sync">🔄 Sincronizar agora</button>`;
+}
+
+/** Aviso fino no topo quando algo da nuvem pede atenção (sem sinal, pendências, conflito). */
+export function cloudBar() {
+  const c = cloud;
+  if (!c.online) return `<div class="cloud-bar off">📴 Sem internet${c.pending ? ` · ${c.pending} alteração(ões) aguardando sinal` : ' · dados da última sincronização'}</div>`;
+  if (c.needLogin) return '<div class="cloud-bar warn" data-act="admin-toggle">⚠️ Alterações esperando envio: toque para entrar com o PIN mestre</div>';
+  if (c.pending) return `<div class="cloud-bar">⏳ Enviando ${c.pending} alteração(ões)…</div>`;
+  return '';
 }
 
 export { ROLE_NAMES };

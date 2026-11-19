@@ -1,7 +1,7 @@
-// Modo administrador (RN-98 a RN-102) e importação da base em lote (RN-103 a RN-107).
+// Permissões com PIN mestre (RN-113 a RN-117) e importação da base em lote (RN-103 a RN-107).
 import { suite, test, assert } from './harness.js';
 import {
-  sha256, validatePinFormat, createPinRecord, definePin, checkPin, pinLockSeconds, requiresAdmin, adminExpiry, isAdminActive, PIN_RULES,
+  validatePinFormat, validatePlayerCode, validateOwnPositions, requiresAdmin, adminExpiry, isAdminActive, PIN_RULES, ADMIN_ACTIONS,
   parseRosterLine, parseRoster, planRosterImport, applyRosterImport, rosterPlanSummary, rosterText, validatePlayer, seedPlayers,
 } from '../src/domain/index.js';
 import { OFFICIAL_ROSTER } from '../src/data/lista-oficial.js';
@@ -13,18 +13,7 @@ function memBackend() {
   return { getItem: (k) => m.get(k) ?? null, setItem: (k, v) => m.set(k, String(v)), removeItem: (k) => m.delete(k), m };
 }
 
-const SALT = 'sal-de-teste-123';
-
-suite('Modo administrador (PIN)', () => {
-  test('SHA-256 confere com vetores oficiais', () => {
-    assert.equal(sha256(''), 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855');
-    assert.equal(sha256('abc'), 'ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad');
-    assert.equal(
-      sha256('abcdbcdecdefdefgefghfghighijhijkijkljklmklmnlmnomnopnopq'),
-      '248d6a61d20638b8e5c026930c3e6039a33ce45964ff2167f6ecedd419db06c1',
-    );
-  });
-
+suite('Permissões: PIN mestre e própria posição (RN-113 a RN-117)', () => {
   test('Formato do PIN: só números, 4 a 8 dígitos', () => {
     assert.equal(validatePinFormat('1234'), '1234');
     assert.equal(validatePinFormat('12345678'), '12345678');
@@ -34,53 +23,37 @@ suite('Modo administrador (PIN)', () => {
     assert.throws(() => validatePinFormat(''), /só números/);
   });
 
-  test('PIN é guardado só como hash com sal e confirmação precisa conferir', () => {
-    const rec = definePin('2468', '2468', SALT);
-    assert.ok(!JSON.stringify(rec).includes('2468'), 'o PIN não pode aparecer no registro');
-    assert.equal(rec.hash.length, 64);
-    assert.ok(createPinRecord('2468', 'outro-sal-99').hash !== rec.hash, 'sal diferente gera hash diferente');
-    assert.throws(() => definePin('2468', '2469', SALT), /confirmação/);
-  });
-
-  test('PIN certo libera e zera erros; PIN errado conta tentativa sem mutar o registro', () => {
-    const rec = createPinRecord('2468', SALT);
-    const bad = checkPin(rec, '0000', 1000);
-    assert.equal(bad.ok, false);
-    assert.equal(bad.record.failures, 1);
-    assert.equal(rec.failures, 0, 'registro original intacto');
-    const good = checkPin(bad.record, '2468', 2000);
-    assert.equal(good.ok, true);
-    assert.equal(good.record.failures, 0);
-  });
-
-  test('Bloqueio temporário após 5 erros, dobrando até 5 minutos', () => {
-    assert.equal(pinLockSeconds(4), 0);
-    assert.equal(pinLockSeconds(5), 30);
-    assert.equal(pinLockSeconds(6), 60);
-    assert.equal(pinLockSeconds(20), PIN_RULES.lockMaxSeconds);
-    let rec = createPinRecord('2468', SALT);
-    let t = 0;
-    for (let i = 0; i < 5; i++) rec = checkPin(rec, '1111', t).record;
-    assert.ok(rec.lockedUntil === 30000, 'bloqueado por 30 s');
-    const during = checkPin(rec, '2468', 10000);
-    assert.equal(during.ok, false, 'nem o PIN certo entra durante o bloqueio');
-    assert.equal(during.waitSeconds, 20);
-    assert.equal(checkPin(rec, '2468', 30001).ok, true);
-  });
-
-  test('Operações protegidas × rotina livre', () => {
-    for (const a of ['player-create', 'player-edit', 'player-delete', 'roster-import', 'backup-import', 'data-wipe', 'history-delete']) {
-      assert.ok(requiresAdmin(a), `${a} deveria exigir PIN`);
+  test('Sem PIN só se vê, compartilha, exporta e troca a própria posição; o resto exige o PIN mestre', () => {
+    for (const a of ['view', 'share', 'export', 'own-positions']) assert.ok(!requiresAdmin(a), `${a} deveria ser livre`);
+    for (const a of ['draw', 'pelada', 'result', 'player-create', 'player-edit', 'player-delete', 'player-code', 'roster-import',
+      'backup-import', 'settings', 'history-delete', 'pin-change', 'qualquer-coisa', 'toString']) {
+      assert.ok(requiresAdmin(a), `${a} deveria exigir o PIN mestre`);
     }
-    for (const a of ['draw', 'checkin', 'late-arrival', 'result', 'transfer', 'view', 'export', 'toString']) {
-      assert.ok(!requiresAdmin(a), `${a} deveria ser livre`);
-    }
+    for (const a of Object.keys(ADMIN_ACTIONS)) assert.ok(requiresAdmin(a));
   });
 
-  test('Liberação expira 15 minutos após a última ação', () => {
+  test('Código do jogador: exatamente 4 números', () => {
+    assert.equal(validatePlayerCode(' 0427 '), '0427');
+    assert.throws(() => validatePlayerCode('427'), /4 números/);
+    assert.throws(() => validatePlayerCode('12345'), /4 números/);
+    assert.throws(() => validatePlayerCode('12a4'), /4 números/);
+  });
+
+  test('Própria posição: só jogador de linha, ao menos uma, só D/M/A, devolvidas na ordem D, M, A', () => {
+    const line = P('Ari', 2.5, 'line', ['D', 'M']);
+    assert.deepEqual(validateOwnPositions(line, ['A', 'D']), ['D', 'A']);
+    assert.deepEqual(validateOwnPositions(line, ['M', 'M']), ['M']);
+    assert.throws(() => validateOwnPositions(line, []), /ao menos uma/);
+    assert.throws(() => validateOwnPositions(line, ['G']), /inválida/);
+    assert.throws(() => validateOwnPositions(P('Jarbas', 2, 'gk'), ['D']), /Goleiro/);
+    assert.throws(() => validateOwnPositions(null, ['D']), /não encontrado/);
+  });
+
+  test('Acesso de administrador vale 12 horas', () => {
     const until = adminExpiry(0);
-    assert.ok(isAdminActive(until, 14 * 60 * 1000));
-    assert.ok(!isAdminActive(until, 15 * 60 * 1000 + 1));
+    assert.equal(PIN_RULES.sessionHours, 12);
+    assert.ok(isAdminActive(until, 12 * 3600 * 1000 - 1));
+    assert.ok(!isAdminActive(until, 12 * 3600 * 1000 + 1));
     assert.ok(!isAdminActive(undefined, 0));
   });
 });

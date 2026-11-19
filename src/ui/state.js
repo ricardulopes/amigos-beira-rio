@@ -1,6 +1,7 @@
 // Estado compartilhado da interface (não contém regras de negócio).
 import { createStore } from '../storage/storage.js';
 import { isAdminActive } from '../domain/index.js';
+import { track, baselineCopy, adminUntil } from '../cloud/sync.js';
 
 export const store = createStore();
 
@@ -17,17 +18,27 @@ export const app = {
     showExits: true,
     historyTab: 'games',
     lastExplanation: null,
-    adminUntil: 0, // modo administrador: liberado até este instante (só em memória; recarregar bloqueia)
   },
   render: () => {},
 };
 
+/**
+ * Grava no aparelho e enfileira o envio para a nuvem (RN-115). Só administrador grava (RN-114):
+ * para os demais, a mudança local é desfeita e nada é enviado.
+ */
 export function save() {
+  if (!track(app.db)) {
+    const prev = baselineCopy();
+    if (prev) app.db = prev;
+    toast('Somente administradores podem alterar. Entre com o PIN mestre.', 'error');
+    return false;
+  }
   try {
     store.save(app.db);
   } catch (e) {
     alert('Não foi possível salvar os dados (armazenamento cheio?). Exporte um backup.\n' + e.message);
   }
+  return true;
 }
 
 export function activeSession() {
@@ -41,8 +52,9 @@ export function replaceSession(s) {
   else app.db.sessions.push(s);
 }
 
+/** Este aparelho entrou com o PIN mestre e o acesso (12 h) ainda vale. */
 export function adminActive() {
-  return isAdminActive(app.ui.adminUntil);
+  return isAdminActive(adminUntil());
 }
 
 export function setupState() {

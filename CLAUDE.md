@@ -27,9 +27,15 @@ ele é a fonte das regras de negócio (identificadas como `RN-xx`). O `README.md
 
 ## Stack e restrições
 
-- HTML + CSS + JavaScript puro com **ES modules**. **Sem dependências, sem frameworks, sem build, sem CDN.**
+- HTML + CSS + JavaScript puro com **ES modules**. **Sem frameworks, sem build, sem CDN.** Única dependência:
+  `@supabase/supabase-js` 2.118.0 guardado em `vendor/supabase.js` (UMD, `window.supabase`), carregado no `index.html`.
   O app precisa funcionar offline no campo; tudo é servido localmente.
-- Persistência em `localStorage` via `src/storage/storage.js` (esquema versionado). Nada de backend.
+- Dados oficiais no **Supabase** (RN-113 a RN-117): `supabase/schema.sql` (tabelas, RLS só leitura, funções
+  `admin_*` com token do PIN mestre, `player_set_positions` com código, Realtime). O app usa só a chave
+  publicável (`src/cloud/config.js`); nunca coloque a chave secreta no app. Cópia local em `localStorage`
+  via `src/storage/storage.js` (cache offline). `save()` em `state.js` grava o cache e chama `track()` de
+  `src/cloud/sync.js`, que enfileira e envia; não grave na nuvem por outro caminho. Mudou o SQL? Atualize
+  `supabase/schema.sql` de forma reexecutável e avise o dono para rodá-lo no SQL Editor.
 - Alvo: Chrome Android recente. Pode usar JS moderno (`??`, `?.`, `structuredClone` não é necessário — o projeto usa clone JSON).
 
 ## Arquitetura (camadas — respeite as fronteiras)
@@ -54,7 +60,7 @@ src/domain/    REGRAS DE NEGÓCIO PURAS. Sem DOM, sem navegador, sem armazenamen
   balance.js     avisos de desequilíbrio
   stats.js       desempenho por jogador, resumo do sorteio, grupos de saída da equipe
   share.js       texto para WhatsApp
-  admin.js       modo administrador: PIN (SHA-256 puro + sal), bloqueio por tentativas, operações protegidas
+  admin.js       permissões: ações públicas × PIN mestre, formato do PIN/código, validação da própria posição
   roster.js      importação da base em lote: leitura da lista, plano (criar/atualizar/excluir), aplicação
 src/storage/   persistência (storage.js): esquema, pilha de desfazer, exportar/importar backup
 src/ui/        APRESENTAÇÃO E ORQUESTRAÇÃO
@@ -129,7 +135,10 @@ tests/         harness próprio + suítes (*.test.js) + runner de navegador e de
   **nenhum botão pode ficar sem funcionamento**.
 - Mobile-first: testar em 360 px de largura. Alvos de toque ≥ 44 px. Sem rolagem horizontal da página.
 - Ações que destroem dados (excluir, encerrar, descartar, apagar, importar) passam por modal de confirmação.
-- Ações protegidas por PIN (lista em `ADMIN_ACTIONS`, RN-99) passam por `withAdmin(acao, fn)` em `app.js`.
+- Permissões (RN-114): toda ação `data-act` exige o PIN mestre, exceto as listadas em `FREE_ACTIONS` em `app.js`
+  (ver, filtrar, compartilhar, exportar, ficha do jogador). Campos de ajustes/seleção ficam em `ADMIN_FIELDS`.
+  Botão novo que só lê/navega entra em `FREE_ACTIONS`; o resto fica protegido automaticamente.
+  Para pedir o PIN dentro de uma ação, use `withAdmin(acao, fn)` em `app.js`.
   Botão novo que altere cadastro/estrelas/posições ou apague dados deve usar esse caminho; rotina da pelada não.
 - Cores via variáveis CSS em `:root`, com variante escura em `prefers-color-scheme: dark`. Identidade ABR:
   Azul `#002B7F` (`--abr-blue`) e Amarelo `#FFD100` (`--abr-yellow`, sempre com texto azul/preto).
@@ -140,7 +149,7 @@ tests/         harness próprio + suítes (*.test.js) + runner de navegador e de
 ## Testes (obrigatório)
 
 - Toda mudança em regra de negócio exige teste novo ou atualizado em `tests/` **antes** de considerar
-  pronto, e toda a suíte precisa passar (hoje: 119 testes). Testes do domínio importam de
+  pronto, e toda a suíte precisa passar (hoje: 124 testes). Testes do domínio importam de
   `../src/domain/index.js`, nunca da interface.
 - Regras de empate/rodízio: testar o **estado interno** (field, queue, permanence, stats, composição
   das equipes), não só textos. Use `mkSession(sizes, {gks, config, stars})` de `tests/helpers.js` para

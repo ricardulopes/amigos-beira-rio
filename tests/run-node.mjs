@@ -6,6 +6,7 @@ import './draw.test.js';
 import './domain.test.js';
 import './admin.test.js';
 import './vests.test.js';
+import './cloud.test.js';
 import './isolation.test.js';
 
 const results = await runAll();

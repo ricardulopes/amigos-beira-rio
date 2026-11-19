@@ -8,9 +8,11 @@ import {
   validatePlayer, snapshotPlayer, playerDraft, togglePosition, prepareDraw, clampLinePerTeam, clampTolerance, clampTransferQty,
   createSession, redraw, startSession, finishSession, analyzeResult, registerResult, addLatePlayer, removePlayer,
   transferPlayers, movePlayerInOrder, swapPlayers, moveGoalkeeper, setPermanence, RuleError,
-  shareText, requiresAdmin, adminExpiry, definePin, checkPin, parseRoster, planRosterImport, applyRosterImport, rosterPlanSummary, rosterText,
+  shareText, validatePinFormat, validatePlayerCode, validateOwnPositions, parseRoster, planRosterImport, applyRosterImport, rosterPlanSummary,
+  rosterText,
 } from '../domain/index.js';
 import { OFFICIAL_ROSTER } from '../data/lista-oficial.js';
+import { initCloud, login, logout, changePin, newPlayerCode, setOwnPositions, rememberedCode, pullAll, flush, cloud } from '../cloud/sync.js';
 
 // ------------------------------------------------------------------ renderização
 
@@ -93,51 +95,53 @@ function exec(labelText, fn, { silent = false } = {}) {
   }
 }
 
-// ------------------------------------------------------------------ modo administrador (RN-98 a RN-102)
+// ------------------------------------------------------------------ administrador: PIN mestre no servidor (RN-113, RN-114)
 
-function newSalt() {
-  try {
-    const a = new Uint8Array(16);
-    crypto.getRandomValues(a);
-    return [...a].map((b) => b.toString(16).padStart(2, '0')).join('');
-  } catch {
-    return Math.random().toString(36).slice(2) + Date.now().toString(36);
-  }
-}
-
-/** Executa `then` só com o modo administrador liberado; pede (ou cria) o PIN quando preciso. */
+/** Executa `then` só com acesso de administrador; senão pede o PIN mestre (precisa de internet). */
 function withAdmin(action, then) {
-  if (!requiresAdmin(action)) return then();
-  if (adminActive()) {
-    app.ui.adminUntil = adminExpiry();
-    return then();
-  }
-  openModal('pin', { mode: store.loadAdmin() ? 'enter' : 'create', action, pin: '', pin2: '', then });
+  if (adminActive()) return then();
+  openModal('pin', { mode: 'enter', action, pin: '', pin2: '', then });
 }
 
-function pinOk() {
+async function pinOk() {
   const m = app.ui.modal;
-  if (m.mode === 'enter') {
-    const res = checkPin(store.loadAdmin(), m.pin);
-    store.saveAdmin(res.record);
-    if (!res.ok) {
-      m.error = res.message;
-      m.pin = '';
-      return render();
-    }
-  } else {
-    try {
-      store.saveAdmin(definePin(m.pin, m.pin2, newSalt()));
-    } catch (e) {
-      Object.assign(m, { error: e.message, pin: '', pin2: '' });
-      return render();
-    }
+  if (!m || m.busy) return;
+  try {
+    const pin = validatePinFormat(m.pin);
+    if (m.mode === 'change' && String(m.pin2 ?? '').trim() !== pin) throw new Error('A confirmação não confere com o PIN digitado.');
+    m.busy = true;
+    m.error = '';
+    render();
+    if (m.mode === 'change') await changePin(pin);
+    else await login(pin);
+  } catch (e) {
+    Object.assign(m, { busy: false, error: e.message, pin: '', pin2: '' });
+    if (app.ui.modal === m) render();
+    return;
   }
-  app.ui.adminUntil = adminExpiry();
-  app.ui.modal = null;
-  const msg = m.mode === 'create' ? 'PIN criado. Modo administrador liberado por 15 min.' : m.mode === 'change' ? 'PIN alterado.' : 'Modo administrador liberado por 15 min.';
+  if (app.ui.modal === m) app.ui.modal = null;
+  toast(m.mode === 'change' ? 'PIN mestre alterado. Os outros aparelhos precisam entrar de novo.' : 'Administrador liberado neste aparelho por 12 horas.', 'ok', 5000);
   if (m.then) m.then();
-  toast(msg, 'ok');
+}
+
+/**
+ * Ações livres para qualquer pessoa (RN-114): navegar, ver, filtrar, compartilhar, exportar e a ficha
+ * do jogador (própria posição, com código). Também as que só mexem em janelas já liberadas.
+ * Qualquer outra ação pede o PIN mestre antes de rodar.
+ */
+const FREE_ACTIONS = new Set([
+  'go', 'go-history', 'modal-close', 'modal-close-bg', 'pfilter', 'toggle-invert', 'toggle-queue', 'dismiss-exp', 'htab',
+  'share', 'share-copy', 'share-wa', 'share-native', 'export', 'share-backup', 'open-log', 'open-more',
+  'admin-toggle', 'pin-ok', 'player-edit', 'self-pos', 'self-save', 'cloud-sync', 'wipe', 'confirm-ok',
+  'm-set', 'm-qty', 'm-pos', 'm-type', 'pick', 'roster-official', 'roster-current', 'roster-preview',
+]);
+
+/** Ajustes e seleção de presentes (campos de formulário) também são do administrador. */
+const ADMIN_FIELDS = new Set(['stitle', 'ssched', 'setup-gk', 'setup-reqgk', 'set-group', 'set-tol', 'set-n', 'set-gk', 'set-reqgk', 'set-toss', 'import']);
+
+function blockField() {
+  render(); // devolve o valor que estava
+  if (!app.ui.modal) withAdmin('settings', () => toast('Administrador liberado. Faça a alteração de novo.', 'ok'));
 }
 
 function cleanSelection() {
@@ -151,11 +155,55 @@ const actions = {
   'pin-ok': () => pinOk(),
   'admin-toggle': () => {
     if (adminActive()) {
-      app.ui.adminUntil = 0;
-      toast('Modo administrador bloqueado.', 'ok');
-    } else openModal('pin', { mode: store.loadAdmin() ? 'enter' : 'create', pin: '', pin2: '' });
+      logout();
+      toast('Saiu do modo administrador neste aparelho.', 'ok');
+    } else openModal('pin', { mode: 'enter', pin: '', pin2: '' });
   },
   'pin-change': () => withAdmin('pin-change', () => openModal('pin', { mode: 'change', pin: '', pin2: '' })),
+  'cloud-sync': async () => {
+    toast('Sincronizando…');
+    await pullAll();
+    await flush();
+    toast(cloud.error ? cloud.error : 'Dados sincronizados com a nuvem.', cloud.error ? 'error' : 'ok', 5000);
+  },
+
+  // ---------- ficha do jogador: a própria posição, com o código (RN-116)
+  'self-pos': (d) => {
+    const m = app.ui.modal;
+    m.positions = togglePosition(m.positions, d.r);
+    m.error = '';
+    m.ok = '';
+    render();
+  },
+  'self-save': async () => {
+    const m = app.ui.modal;
+    if (!m || m.busy) return;
+    const p = app.db.players.find((x) => x.id === m.id);
+    try {
+      const positions = validateOwnPositions(p, m.positions);
+      const code = validatePlayerCode(m.code);
+      Object.assign(m, { busy: true, error: '', ok: '' });
+      render();
+      const saved = await setOwnPositions(p.id, code, positions);
+      Object.assign(m, { busy: false, positions: saved, ok: 'Posições salvas para todos os aparelhos.' });
+    } catch (e) {
+      Object.assign(m, { busy: false, error: e.message });
+    }
+    if (app.ui.modal === m) render();
+  },
+  'player-code': async () => {
+    const m = app.ui.modal;
+    if (!m?.id || m.busy) return;
+    try {
+      Object.assign(m, { busy: true, error: '' });
+      render();
+      m.code = await newPlayerCode(m.id);
+    } catch (e) {
+      m.error = e.message;
+    }
+    m.busy = false;
+    if (app.ui.modal === m) render();
+  },
 
   // ---------- importação em lote (RN-103 a RN-107)
   'open-roster': () => withAdmin('roster-import', () => openModal('roster', { text: '', mode: 'merge', plan: null })),
@@ -213,9 +261,12 @@ const actions = {
 
   // ---------- cadastro
   'player-new': (d) => withAdmin('player-create', () => openModal('player', { draft: playerDraft(), select: d.select === '1' })),
+  // Admin abre o cadastro completo; os demais, a ficha (ver dados e trocar a própria posição).
   'player-edit': (d) => {
     const p = app.db.players.find((x) => x.id === d.id);
-    if (p) withAdmin('player-edit', () => openModal('player', { id: p.id, draft: playerDraft(p) }));
+    if (!p) return;
+    if (adminActive()) openModal('player', { id: p.id, draft: playerDraft(p) });
+    else openModal('self', { id: p.id, positions: [...p.positions], code: rememberedCode(p.id), error: '', ok: '' });
   },
   pick: (d) => {
     app.ui.modal.draft[d.name] = Number(d.value);
@@ -235,7 +286,6 @@ const actions = {
     try {
       const existing = app.db.players.find((p) => p.id === m.id);
       const p = validatePlayer({ ...m.draft, id: m.id, createdAt: existing?.createdAt }, app.db.players);
-      app.ui.adminUntil = Math.max(app.ui.adminUntil, adminExpiry()); // ação de administrador renova a liberação
       if (existing) Object.assign(existing, p);
       else app.db.players.push(p);
       if (m.select) {
@@ -487,7 +537,7 @@ const actions = {
   'delete-session': (d) =>
     withAdmin('history-delete', () => openModal('confirm', {
       title: 'Excluir do histórico',
-      text: 'Esta pelada será removida permanentemente do histórico deste aparelho. Exporte um backup antes se quiser guardá-la.',
+      text: 'Esta pelada será removida permanentemente do histórico de todos os aparelhos. Exporte um backup antes se quiser guardá-la.',
       okText: 'Excluir',
       danger: true,
       onOk: () => {
@@ -521,21 +571,18 @@ const actions = {
       }
     } else actions.export();
   },
+  // Limpa só a cópia deste aparelho; os dados da nuvem continuam e são baixados de novo.
   wipe: () =>
-    withAdmin('data-wipe', () => openModal('confirm', {
-      title: 'Apagar todos os dados',
-      text: 'Isto apaga jogadores, peladas e histórico deste aparelho e não pode ser desfeito. Exporte um backup antes.',
-      okText: 'Apagar tudo',
+    openModal('confirm', {
+      title: 'Limpar dados deste aparelho',
+      text: `Apaga a cópia local (e o acesso de administrador) deste aparelho e baixa tudo de novo da nuvem. Nada é apagado para os outros.${cloud.pending ? ` Atenção: ${cloud.pending} alteração(ões) ainda não enviada(s) serão perdidas.` : ''}`,
+      okText: 'Limpar e recarregar',
       danger: true,
       onOk: () => {
-        const sid = app.db.activeSessionId;
-        if (sid) store.clearUndo(sid);
-        app.db = { schema: 1, players: [], sessions: [], settings: app.db.settings, activeSessionId: null };
-        save();
-        app.ui.modal = null;
-        navigate('/');
+        store.clearLocal();
+        location.reload();
       },
-    })),
+    }),
 };
 
 async function copy(text) {
@@ -598,9 +645,14 @@ function doDraw() {
 document.addEventListener('click', (ev) => {
   const el = ev.target.closest('[data-act]');
   if (!el || el.disabled) return;
-  const fn = actions[el.dataset.act];
+  const act = el.dataset.act;
+  const fn = actions[act];
   if (!fn) return;
   if (el.tagName === 'A') ev.preventDefault();
+  if (!FREE_ACTIONS.has(act) && !adminActive()) {
+    const data = { ...el.dataset };
+    return withAdmin('pelada', () => fn(data, el, ev));
+  }
   fn(el.dataset, el, ev);
 });
 
@@ -608,6 +660,7 @@ document.addEventListener('input', (ev) => {
   const el = ev.target;
   const key = el.dataset.input;
   if (!key) return;
+  if (ADMIN_FIELDS.has(key) && !adminActive()) return blockField();
   if (key === 'psearch') {
     app.ui.playerFilter.query = el.value;
     render();
@@ -637,6 +690,10 @@ document.addEventListener('change', async (ev) => {
   const el = ev.target;
   const key = el.dataset.change;
   if (!key) return;
+  if (ADMIN_FIELDS.has(key) && !adminActive()) {
+    if (key === 'import') el.value = '';
+    return blockField();
+  }
   const st = app.db.settings;
   const setup = setupState();
   switch (key) {
@@ -693,11 +750,12 @@ document.addEventListener('change', async (ev) => {
         const parsed = store.parseImport(text);
         withAdmin('backup-import', () => openModal('confirm', {
           title: 'Importar backup',
-          text: `O backup tem ${parsed.players.length} jogadores e ${parsed.sessions.length} peladas. Os dados atuais deste aparelho serão substituídos (uma cópia de segurança é guardada).`,
+          text: `O backup tem ${parsed.players.length} jogadores e ${parsed.sessions.length} peladas. Os dados atuais serão substituídos na nuvem, para TODOS os aparelhos (uma cópia de segurança do que havia fica neste aparelho).`,
           okText: 'Importar',
           danger: true,
           onOk: () => {
             app.db = store.importData(text, app.db);
+            save(); // envia para a nuvem
             app.ui.modal = null;
             toast('Backup importado.', 'ok');
             navigate('/');
@@ -739,5 +797,27 @@ if (navigator.storage?.persist) navigator.storage.persist().catch(() => {});
 if ('serviceWorker' in navigator && location.protocol !== 'file:') {
   navigator.serviceWorker.register('sw.js').catch(() => {});
 }
+
+// Banco unificado na nuvem (RN-113 a RN-117): baixa os dados, escuta mudanças e envia a fila.
+let statusFrame = 0;
+initCloud({
+  getDb: () => app.db,
+  setDb: (db) => {
+    app.db = db;
+    render();
+  },
+  cache: (db) => {
+    try {
+      store.save(db);
+    } catch {
+      /* armazenamento cheio: a nuvem continua valendo */
+    }
+  },
+  onStatus: () => {
+    cancelAnimationFrame(statusFrame);
+    statusFrame = requestAnimationFrame(() => render());
+  },
+  onConflict: (msg) => toast(msg, 'error', 9000),
+});
 
 onRoute();

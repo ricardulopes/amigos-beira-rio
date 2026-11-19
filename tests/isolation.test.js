@@ -37,6 +37,12 @@ async function domainModules() {
 }
 
 suite('Isolamento do domínio', () => {
+  test('Nenhuma chave secreta do Supabase no app (só a publicável)', async () => {
+    const code = await readSource('../src/cloud/config.js');
+    assert.ok(/sb_publishable_/.test(code), 'deve usar a chave publicável');
+    assert.ok(!/sb_secret_|service_role/.test(stripComments(code)), 'chave secreta nunca pode ir para o app');
+  });
+
   test('index.js exporta todos os módulos do domínio', async () => {
     const files = await domainModules();
     for (const f of ['stars.js', 'draw.js', 'tieRules.js', 'rotation.js', 'setup.js', 'session.js']) {
@@ -60,7 +66,10 @@ suite('Isolamento do domínio', () => {
   });
 
   test('Interface e persistência importam o domínio somente via index.js', async () => {
-    const files = ['../src/ui/app.js', '../src/ui/views.js', '../src/ui/modals.js', '../src/ui/dom.js', '../src/ui/state.js', '../src/storage/storage.js'];
+    const files = [
+      '../src/ui/app.js', '../src/ui/views.js', '../src/ui/modals.js', '../src/ui/dom.js', '../src/ui/state.js', '../src/storage/storage.js',
+      '../src/cloud/sync.js', '../src/cloud/diff.js', '../src/cloud/config.js',
+    ];
     for (const f of files) {
       const code = await readSource(f);
       const deep = [...code.matchAll(/from\s+'([^']*domain\/[^']+)'/g)].map((m) => m[1]).filter((p) => !p.endsWith('/domain/index.js'));

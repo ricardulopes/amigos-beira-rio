@@ -3,7 +3,8 @@
 PWA (instalável no Android) da pelada dos **Amigos Beira Rio**: cadastro permanente de jogadores, sorteio
 otimizado, fila PRO/RE/TRI, rodízio, coletes Amarelo/Azul, regras de empate, atrasados, lesões, desfazer,
 histórico e backup.
-Sem dependências e sem etapa de build: HTML + CSS + JavaScript (ES modules). Funciona offline.
+Sem etapa de build: HTML + CSS + JavaScript (ES modules). Dados unificados na nuvem (Supabase), com
+cópia em cada aparelho para funcionar offline no campo.
 
 ## Como rodar
 
@@ -21,8 +22,21 @@ Com Node instalado também dá para rodar: `node tests/run-node.mjs`.
 2. Abra o endereço no Chrome do Android → menu ⋮ → **Instalar app** / **Adicionar à tela inicial**.
 3. Depois de aberto uma vez, funciona sem internet (service worker).
 
-Os dados ficam no próprio aparelho (localStorage). Use **Ajustes → Exportar backup** com frequência; o
-**Importar backup** restaura tudo (inclusive para passar de um celular para outro).
+Os dados ficam no **banco unificado (Supabase)** e são iguais em todos os celulares; cada aparelho guarda
+uma cópia para abrir sem sinal. **Ajustes → Exportar backup** continua disponível para guardar uma cópia.
+
+## Banco na nuvem (Supabase) — configuração única
+
+1. No painel do Supabase do projeto, abra **SQL Editor → New query**, cole o conteúdo de
+   `supabase/schema.sql` e clique em **Run**. Isso cria as tabelas, as permissões (RLS), as funções
+   protegidas, liga o tempo real (Realtime) e carrega os 78 atletas da lista oficial.
+2. Numa consulta separada, defina o **PIN mestre** (4 a 8 números) — não salve o PIN em arquivo:
+   `select public.set_master_pin('SEU_PIN');`
+3. Pronto: abra o app. Em **Ajustes → Banco na nuvem** deve aparecer "Conectado".
+
+A conexão usa só a chave **publicável** do Supabase, gravada em `src/cloud/config.js` (ela é feita para
+ficar no app). **Não é preciso configurar variáveis de ambiente no Vercel**: o app não tem etapa de
+build. Nunca coloque a chave secreta (`sb_secret_…` / service_role) no app.
 
 ## Identidade visual e ícones
 
@@ -47,13 +61,20 @@ O app mostra o colete (dupla-face) de cada equipe em campo:
 - O time **PRO** mostra um colete metade amarelo/metade azul ("entra com o colete de quem sair") até o
   resultado; a confirmação do resultado já diz as cores da próxima partida.
 
-## Modo administrador (PIN)
+## Administradores (PIN mestre) e jogadores
 
-Cadastrar, editar estrelas/posições, excluir jogadores, importar lista ou backup, apagar dados e
-excluir peladas do histórico pedem um **PIN de 4 a 8 números** (criado na primeira vez). Sorteio,
-presença, atrasados já cadastrados, resultados e ajustes de equipes ficam livres. A liberação dura
-15 min (botão 🔒/🔓 em Jogadores e Ajustes). O PIN fica só no aparelho e não vai no backup.
-É uma proteção contra alterações acidentais, não segurança forte.
+- **Qualquer pessoa** vê todas as abas, compartilha e exporta backup. Para mudar **as próprias posições**
+  (Defesa/Meio/Ataque): **Jogadores → tocar no próprio nome**, escolher as posições e digitar o
+  **código de jogador** (4 números) que um administrador passou. Vale para todos os celulares.
+- **Administradores** entram com o **PIN mestre** único da ABR (botão 🔒 em Jogadores ou Ajustes; precisa
+  de internet). O acesso dura 12 horas no aparelho, inclusive sem sinal no campo. Só eles sorteiam,
+  registram resultados, mexem na partida, cadastram, mudam estrelas, importam e alteram ajustes.
+- **Código do jogador:** admin → Jogadores → tocar no jogador → **🔑 Gerar código do jogador**. O código
+  aparece uma vez; gerar outro invalida o anterior.
+- **Sem sinal:** o admin continua usando o app; as alterações ficam na fila (barra no topo) e sobem
+  sozinhas quando o sinal voltar. Se outro admin mexeu na mesma pelada antes, vale a versão dele e você
+  é avisado.
+- **Trocar o PIN mestre:** Ajustes → Alterar PIN mestre (admin), ou no SQL Editor com `set_master_pin`.
 
 ## Importar lista de atletas
 
@@ -62,8 +83,8 @@ presença, atrasados já cadastrados, resultados e ajustes de equipes ficam livr
 **Conferir lista** mostra o que será criado/atualizado/excluído e os erros por linha; **Aplicar**
 grava. "Mesclar" mantém o resto do cadastro; "Substituir" exclui quem não estiver na lista.
 **Lista do grupo já vem no app:** na primeira vez que o app é aberto num aparelho, o cadastro já começa
-com os 78 atletas da lista oficial, sem precisar importar. Para mudar a lista que vem de fábrica, edite
-`src/data/lista-oficial.js`. Aparelhos que já têm dados não são alterados.
+com os 78 atletas da lista oficial, sem precisar importar, e logo depois passa a mostrar o cadastro da
+nuvem. A lista também é carregada no Supabase pelo `supabase/schema.sql`.
 
 ## Arquitetura
 
@@ -83,8 +104,12 @@ src/domain/       Regras de negócio puras — sem interface, sem navegador, tes
   adjustments.js  Transferência, ordem, troca, goleiros
   balance.js      Avisos de desequilíbrio      stats.js  Desempenho e resumos
   share.js        Texto para WhatsApp          constants.js / rng.js
-  admin.js        PIN de administrador         roster.js  Importação da base em lote
-src/storage/      Persistência versionada, pilha de desfazer (40 passos), exportar/importar
+  admin.js        Permissões (PIN mestre × livre), código e própria posição
+  roster.js       Importação da base em lote
+src/storage/      Cópia local versionada, pilha de desfazer (40 passos), exportar/importar
+src/cloud/        Supabase: carga, Realtime, fila offline, login de admin (sync.js); parte pura (diff.js)
+supabase/         schema.sql: tabelas, RLS, funções protegidas, Realtime e lista oficial
+vendor/           supabase-js 2.118.0 (guardado no app, sem CDN)
 src/ui/           Interface (views, modais, controlador). Nenhuma regra de negócio aqui.
 tests/            Testes (harness próprio, roda no navegador e no Node), incluindo
                   isolation.test.js, que garante que src/domain não depende da interface
