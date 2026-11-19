@@ -6,7 +6,7 @@ import {
   filterPlayers, ROLE_NAMES, REMOVAL_REASONS, STAR_VALUES, LIMITS, planParticipation, toleranceInfo, defaultTitle as domainDefaultTitle,
   ADMIN_ACTIONS, PUBLIC_ACTIONS, allTeamsInOrder, queueLabel, teamStats, isComplete, linePositions, playerStats, balanceSummary, gamesSummary, teamExitGroups, drawHint, advantageStatus,
   vestOf, vestName, incomingVest,
-  financeSettings, semestersAvailable, semesterRanking, semesterLabel, statement, paymentSummary, formatMoney, PAYMENT_METHODS, FINANCE_RULES,
+  financeSettings, cyclesAvailable, cycleRanking, cycleList, NEXT_CYCLE, statement, paymentSummary, formatMoney, PAYMENT_METHODS, FINANCE_RULES,
   groupCashback, attendanceRecords,
 } from '../domain/index.js';
 
@@ -424,14 +424,22 @@ export function financeView() {
   </main>`;
 }
 
-function rankingTab() {
-  const sems = semestersAvailable(app.db.sessions);
-  const sem = sems.find((x) => `${x.year}-${x.half}` === app.ui.rankSem) || sems[0];
+/** "desde 05/01/27 · encerrado em 20/11/26" (ou "em andamento"). */
+function cyclePeriod(c) {
+  if (c.pending) return 'peladas feitas depois do último encerramento; entram no próximo ciclo quando ele for iniciado';
+  const from = c.start ? `desde ${dateShort(c.start)}` : 'desde o início';
+  return `${from} · ${c.end ? `encerrado em ${dateShort(c.end)}` : 'em andamento'}`;
+}
+
+function rankingTab(f) {
+  const cycles = cyclesAvailable(app.db.sessions, f);
+  // Padrão: o ciclo aberto; na folga, o último encerrado (o do sorteio do campeonato).
+  const cyc = cycles.find((x) => x.id === app.ui.rankCycle) || cycles.find((x) => x.open) || cycles.find((x) => !x.pending);
   const type = app.ui.rankType === 'gk' ? 'gk' : 'line';
-  const r = semesterRanking(app.db.sessions, sem, type);
+  const r = cycleRanking(app.db.sessions, f, cyc.id, type);
   const seg = `<div class="seg"><button class="${type === 'line' ? 'on' : ''}" data-act="frank" data-v="line">Ranking de Linha</button><button class="${type === 'gk' ? 'on' : ''}" data-act="frank" data-v="gk">🧤 Goleiros</button></div>`;
-  const semChips = sems.length > 1
-    ? `<div class="chips scroll-x">${sems.map((x) => `<button class="chip ${x === sem ? 'on' : ''}" data-act="fsem" data-v="${x.year}-${x.half}">${x.half}º sem. ${x.year}</button>`).join('')}</div>`
+  const semChips = cycles.length > 1
+    ? `<div class="chips scroll-x">${cycles.map((x) => `<button class="chip ${x.id === cyc.id ? 'on' : ''}" data-act="fsem" data-v="${esc(x.id)}">${x.pending ? '⏳ Próximo' : esc(x.label)}${x.open ? ' ●' : ''}</button>`).join('')}</div>`
     : '';
   const rows = [];
   r.rows.forEach((x, i) => {
@@ -439,12 +447,15 @@ function rankingTab() {
     rows.push(`<tr class="${x.qualified ? 'q' : ''}" data-act="stmt-pick" data-id="${esc(x.pid)}"><td class="num">${x.position}º</td><td>${esc(x.name)}</td><td class="num">${x.count}</td><td class="num">${x.pct}%</td></tr>`);
   });
   return `${seg}${semChips}
-    <p class="small rank-head"><b>${r.total}</b> jogo(s) realizados no ${semesterLabel(sem)} · <b>Top ${r.top}</b> ${type === 'gk' ? 'goleiros' : 'de linha'} com vaga prioritária.</p>
+    <p class="small rank-head"><b>${esc(cyc.pending ? 'Próximo ciclo' : cyc.label)}</b> · ${cyclePeriod(cyc)}.<br><b>${r.total}</b> jogo(s) realizados · <b>Top ${r.top}</b> ${type === 'gk' ? 'goleiros' : 'de linha'} com vaga prioritária.</p>
+    ${!cycles.some((x) => x.open) ? `<p class="alert warn small">${cyc.pending
+    ? 'Estas peladas foram feitas na folga e entram no próximo ciclo quando um administrador iniciá-lo.'
+    : 'Ciclo encerrado: este ranking está fechado para o sorteio do campeonato. Um administrador inicia o próximo ciclo em Ajustes → Financeiro e Pix.'}</p>` : ''}
     ${r.rows.length
     ? `<table class="tbl rank"><thead><tr><th class="num">#</th><th>Atleta</th><th class="num">Jogos</th><th class="num">%</th></tr></thead><tbody>${rows.join('')}</tbody></table>`
-    : '<div class="card empty">Nenhuma presença neste semestre ainda. Contam as peladas iniciadas no app.</div>'}
+    : '<div class="card empty">Nenhuma presença neste ciclo ainda. Contam as peladas iniciadas no app.</div>'}
     ${r.cutTie ? `<p class="alert warn small">Empate na linha de corte: o ${r.top}º e o ${r.top + 1}º têm o mesmo número de jogos (ordem alfabética só para exibir).</p>` : ''}
-    <p class="muted small">% = presenças ÷ jogos realizados no semestre. O ranking reinicia a cada semestre; o cashback acumula o ano inteiro. Toque num atleta para ver o extrato.</p>`;
+    <p class="muted small">% = presenças ÷ jogos realizados no ciclo. O ranking recomeça quando um administrador inicia um novo ciclo; os ciclos encerrados continuam aqui para consulta. Toque num atleta para ver o extrato.</p>`;
 }
 
 function statementTab(f) {
@@ -460,7 +471,7 @@ function statementTab(f) {
   }
   const st = statement(pid, app.db.sessions, f);
   const c = st.cashback;
-  const sem = st.semester;
+  const sem = st.cycle;
   const pay = (m) => (m ? PAYMENT_METHODS[m] : '<span class="warn-text">pendente</span>');
   const entries = st.entries.map((e) => e.kind === 'game'
     ? `<li><span class="muted">${dateShort(e.date)}</span> ${esc(e.title)} · ${e.type === 'gk' ? '🧤 gol' : 'linha'} · ${pay(e.payment)}<b class="amt">${e.cents ? `+${formatMoney(e.cents)}` : '—'}</b></li>`
@@ -470,17 +481,19 @@ function statementTab(f) {
       <div class="counters c3">
         <div><b>${sem.line}<small>/${sem.total}</small></b><span>jogos de linha · ${sem.linePct}%</span></div>
         <div><b>${sem.gk}</b><span>jogos no gol</span></div>
-        <div><b>${formatMoney(c.total).replace('R$ ', '')}</b><span>cashback ${c.year} (R$)</span></div>
+        <div><b>${formatMoney(c.total).replace('R$ ', '')}</b><span>cashback (R$)</span></div>
       </div>
-      <p class="small">${semesterLabel(sem)} · ${sem.total} jogo(s) realizados.</p>
-      <p class="small">Cashback do ano: ${c.lineGames} presença(s) × ${formatMoney(FINANCE_RULES.cashbackPerGame)} = <b>${formatMoney(c.lineCents)}</b>${c.contribCents ? ` + aportes <b>${formatMoney(c.contribCents)}</b>` : ''}.</p>
+      <p class="small"><b>${esc(sem.label)}</b> · ${cyclePeriod(sem)} · ${sem.total} jogo(s) realizados.</p>
+      <p class="small">Cashback desde ${esc(c.sinceLabel)}: ${c.lineGames} presença(s) × ${formatMoney(FINANCE_RULES.cashbackPerGame)} = <b>${formatMoney(c.lineCents)}</b>${c.contribCents ? ` + aportes <b>${formatMoney(c.contribCents)}</b>` : ''}.</p>
       <div class="party ${c.partyPaid ? 'paid' : ''}">🎉 Festa de fim de ano (${formatMoney(c.partyFee)}): ${c.partyPaid ? '<b>quitada com o cashback!</b>' : `falta <b>${formatMoney(c.partyRemaining)}</b>`}</div>
       ${st.pending ? `<p class="alert warn small">${st.pending} pelada(s) sem pagamento registrado.</p>` : ''}
+      ${st.previousCashback ? `<p class="small muted">Período anterior (desde ${esc(st.previousCashback.sinceLabel)}): cashback de <b>${formatMoney(st.previousCashback.total)}</b>${st.previousCashback.partyPaid ? ' — festa quitada' : ` — faltava ${formatMoney(st.previousCashback.partyRemaining)} para a festa`}.</p>` : ''}
+      ${st.waiting ? `<p class="alert small">${st.waiting} lançamento(s) depois do encerramento do ciclo: entram no próximo ciclo quando ele for iniciado.</p>` : ''}
       <button class="btn primary wide" data-act="pix-open">💠 Pagar com Pix</button>
     </div>
-    <h2 class="section-title">Lançamentos de ${c.year}</h2>
-    ${entries ? `<ul class="plain small stmt-list">${entries}</ul>` : '<p class="muted">Nenhum lançamento neste ano.</p>'}
-    <p class="muted small">Linha: ${formatMoney(FINANCE_RULES.lineFee)} por pelada (${formatMoney(FINANCE_RULES.operational)} operacional + ${formatMoney(FINANCE_RULES.cashbackPerGame)} de cashback). Goleiro: isento, cashback por aportes livres. O cashback zera na virada do ano.</p>`;
+    <h2 class="section-title">Lançamentos desde ${esc(c.sinceLabel)}</h2>
+    ${entries ? `<ul class="plain small stmt-list">${entries}</ul>` : '<p class="muted">Nenhum lançamento neste período.</p>'}
+    <p class="muted small">Linha: ${formatMoney(FINANCE_RULES.lineFee)} por pelada (${formatMoney(FINANCE_RULES.operational)} operacional + ${formatMoney(FINANCE_RULES.cashbackPerGame)} de cashback). Goleiro: isento, cashback por aportes livres. O cashback só zera quando a tesouraria inicia um ciclo novo marcando "zerar cashback".</p>`;
 }
 
 /** Bloco do Pix da tesouraria (aba e janela rápida). */
@@ -521,18 +534,23 @@ function cashTab() {
 }
 
 function contributionsTab(f) {
-  const year = new Date().getFullYear();
-  const g = groupCashback(app.db.sessions, f, year);
-  const list = f.contributions.filter((c) => new Date(c.at).getFullYear() === year).sort((a, b) => b.at.localeCompare(a.at));
+  const cycles = cycleList(f);
+  const cyc = cycles.find((c) => c.open) || cycles[cycles.length - 1];
+  const g = groupCashback(app.db.sessions, f, cyc.id);
+  const since = cycles.find((c) => c.period === cyc.period)?.label || cyc.label;
+  // Na folga, os aportes novos aguardam o próximo ciclo: aparecem na lista para conferência e exclusão.
+  const waiting = cyc.open ? [] : groupCashback(app.db.sessions, f, NEXT_CYCLE).contributions;
+  const list = [...waiting, ...g.contributions].sort((a, b) => b.at.localeCompare(a.at));
   return `<section class="counters c3">
       <div><b>${formatMoney(g.line).replace('R$ ', '')}</b><span>cashback linha (R$)</span></div>
       <div><b>${formatMoney(g.contrib).replace('R$ ', '')}</b><span>aportes (R$)</span></div>
-      <div><b>${formatMoney(g.total).replace('R$ ', '')}</b><span>total ${year} (R$)</span></div>
+      <div><b>${formatMoney(g.total).replace('R$ ', '')}</b><span>total (R$)</span></div>
     </section>
+    <p class="muted small">Período de cashback desde ${esc(since)}.${waiting.length ? ` ${waiting.length} aporte(s) feito(s) depois do encerramento entram no próximo ciclo.` : ''}</p>
     <button class="btn primary wide" data-act="contrib-new">➕ Lançar aporte livre</button>
-    <h2 class="section-title">Aportes de ${year}</h2>
-    ${list.length ? `<ul class="list">${list.map((c) => `<li class="row"><div class="grow"><div class="name">${esc(c.name)} · ${formatMoney(c.cents)}</div><div class="muted small">${dateShort(c.at)}${c.note ? ` · ${esc(c.note)}` : ''}</div></div><button class="btn small danger-ghost" data-act="contrib-del" data-id="${esc(c.id)}" aria-label="Excluir aporte">✕</button></li>`).join('')}</ul>` : '<p class="muted">Nenhum aporte lançado neste ano.</p>'}
-    <p class="muted small">Aportes livres (ex.: R$ 30, R$ 50) somam ao cashback do ano do atleta — usado principalmente pelos goleiros, isentos da taxa de jogo.</p>`;
+    <h2 class="section-title">Aportes do período</h2>
+    ${list.length ? `<ul class="list">${list.map((c) => `<li class="row"><div class="grow"><div class="name">${esc(c.name)} · ${formatMoney(c.cents)}</div><div class="muted small">${dateShort(c.at)}${c.note ? ` · ${esc(c.note)}` : ''}</div></div><button class="btn small danger-ghost" data-act="contrib-del" data-id="${esc(c.id)}" aria-label="Excluir aporte">✕</button></li>`).join('')}</ul>` : '<p class="muted">Nenhum aporte lançado neste período.</p>'}
+    <p class="muted small">Aportes livres (ex.: R$ 30, R$ 50) somam ao cashback do atleta — usado principalmente pelos goleiros, isentos da taxa de jogo.</p>`;
 }
 
 function financeSection() {
@@ -540,12 +558,22 @@ function financeSection() {
   const mode = f.mode === 'test'
     ? '🧪 Modo teste ligado: presenças, pagamentos e aportes estão sendo registrados para conferência.'
     : `✅ Ciclo oficial${f.cycleStart ? ` desde ${dateShort(f.cycleStart)}` : ''}.`;
+  const cycles = cycleList(f);
+  const open = cycles.find((c) => c.open);
+  const last = cycles[cycles.length - 1];
+  const cycleInfo = open
+    ? `🟢 Ciclo aberto: <b>${esc(open.label)}</b> · ${cyclePeriod(open)}.`
+    : `⏸ Nenhum ciclo aberto. Último: <b>${esc(last.label)}</b> (${cyclePeriod(last)}). Peladas da folga entram no próximo ciclo.`;
   return `<p class="small">${mode}</p>
+    <p class="small">${cycleInfo}</p>
     <p class="muted small">Pix: ${f.pixKey || f.pixCopyPaste ? 'configurado' : 'não configurado'}${f.qrImage ? ' · com QR Code' : ''}.</p>
     ${adminActive()
-    ? `<button class="btn wide" data-act="pix-edit">⚙️ Configurar Pix e QR Code</button>
+    ? `${open
+      ? '<button class="btn wide" data-act="cycle-close">🏁 Encerrar ciclo/semestre atual</button>'
+      : '<button class="btn primary wide" data-act="cycle-start">▶️ Iniciar novo ciclo/semestre</button>'}
+       <button class="btn wide" data-act="pix-edit">⚙️ Configurar Pix e QR Code</button>
        <button class="btn danger-ghost wide" data-act="reset-open">🧹 Zerar lançamentos de teste</button>`
-    : '<p class="muted small">Só administradores configuram o Pix e zeram os lançamentos.</p>'}`;
+    : '<p class="muted small">Só administradores encerram/iniciam ciclos, configuram o Pix e zeram os lançamentos.</p>'}`;
 }
 
 // ------------------------------------------------------------------ ajustes

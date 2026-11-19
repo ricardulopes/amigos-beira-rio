@@ -82,11 +82,15 @@ O app mostra o colete (dupla-face) de cada equipe em campo:
 Aba **Caixa** (💲 na barra de baixo). Está em **modo teste**: tudo já funciona e grava na nuvem, mas
 será zerado antes do ciclo oficial.
 - **Presença:** quem está na pelada ganha uma presença quando ela é **iniciada** (sorteio não iniciado não conta).
-- **Linha:** R$ 18 por pelada (R$ 15 operacional + R$ 3 de cashback). Cada presença soma **R$ 3** ao cashback do ano.
+- **Linha:** R$ 18 por pelada (R$ 15 operacional + R$ 3 de cashback). Cada presença soma **R$ 3** ao cashback.
 - **Goleiros:** isentos da taxa; o cashback deles vem de **aportes livres** (ex.: R$ 30, R$ 50) lançados pelo admin.
-- **Festa de dezembro (R$ 300):** o cashback do ano abate a taxa; paga-se só a diferença. Zera na virada do ano.
-- **Ranking de Linha** (Top 32 com vaga prioritária) e **Goleiros** (Top 4), por semestre (jan–jun, jul–dez),
-  com % sobre os jogos realizados. Reinicia a cada semestre.
+- **Festa (R$ 300):** o cashback abate a taxa; paga-se só a diferença. O cashback só zera quando o admin inicia
+  um ciclo novo marcando "Zerar (novo ano da festa)".
+- **Ranking de Linha** (Top 32 com vaga prioritária) e **Goleiros** (Top 4), por **ciclo/semestre**, com % sobre os
+  jogos realizados. Os ciclos encerrados continuam no seletor do ranking para consulta.
+- **Ciclos manuais (admin, Ajustes → Financeiro e Pix):** **🏁 Encerrar ciclo/semestre atual** (fecha o ranking
+  para o sorteio do campeonato) e **▶️ Iniciar novo ciclo/semestre** (ranking recomeça). Pedem para digitar
+  ENCERRAR / INICIAR. Pelada feita na folga, entre o encerramento e o novo início, conta no próximo ciclo.
 - **Extrato (qualquer pessoa):** escolha seu nome e veja jogos, %, cashback, quanto falta para a festa e pendências.
 - **Pix:** chave, "Copia e Cola" e QR Code da tesouraria, com botão de copiar (também no atalho 💠 da tela inicial).
 - **Admin (PIN mestre):** **Caixa do dia** (marcar Pix, Cartão ou Isento de cada atleta; atalho

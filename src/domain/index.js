@@ -48,6 +48,6 @@ export {
 export { parseRosterLine, parseRoster, planRosterImport, applyRosterImport, rosterPlanSummary, rosterText, seedPlayers } from './roster.js';
 export {
   FINANCE_RULES, PAYMENT_METHODS, QR_MAX_CHARS, formatMoney, parseMoney, financeSettings, setPixConfig, setPixQr,
-  semesterOf, semesterLabel, countedPeladas, paymentOf, attendanceRecords, semestersAvailable, semesterRanking,
-  yearCashback, statement, groupCashback, paymentSummary, setPayment, addContribution, removeContribution, resetPreview, resetCycle,
+  semesterOf, semesterLabel, countedPeladas, paymentOf, attendanceRecords, FIRST_CYCLE_ID, NEXT_CYCLE, cycleList, cycleOfDate,
+  currentCycle, cyclesAvailable, cycleRanking, suggestCycleLabel, closeCycle, startCycle, cycleCashback, statement, groupCashback, paymentSummary, setPayment, addContribution, removeContribution, resetPreview, resetCycle,
 } from './finance.js';

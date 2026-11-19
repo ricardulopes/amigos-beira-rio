@@ -10,6 +10,7 @@ import {
   transferPlayers, movePlayerInOrder, swapPlayers, moveGoalkeeper, setPermanence, RuleError,
   shareText, validatePinFormat, parseRoster, planRosterImport, applyRosterImport, rosterPlanSummary,
   rosterText, financeSettings, setPayment, addContribution, removeContribution, setPixConfig, setPixQr, resetCycle, QR_MAX_CHARS, formatMoney,
+  currentCycle, closeCycle, startCycle, suggestCycleLabel,
 } from '../domain/index.js';
 import { OFFICIAL_ROSTER } from '../data/lista-oficial.js';
 import { initCloud, login, logout, changePin, pullAll, flush, cloud } from '../cloud/sync.js';
@@ -626,7 +627,7 @@ const actions = {
     else render();
   },
   fsem: (d) => {
-    app.ui.rankSem = d.v;
+    app.ui.rankCycle = d.v;
     render();
   },
   frank: (d) => {
@@ -709,6 +710,30 @@ const actions = {
       if (save()) {
         app.ui.modal = null;
         toast('Pix da tesouraria salvo para todos os aparelhos.', 'ok');
+      }
+    } catch (e) {
+      m.error = e.message;
+      render();
+    }
+  },
+  // RN-128: ciclos manuais (encerrar / iniciar), com palavra de confirmação
+  'cycle-close': () => openModal('cycle', { mode: 'close', label: currentCycle(financeSettings(app.db.settings))?.label || '', confirm: '' }),
+  'cycle-start': () => openModal('cycle', { mode: 'start', label: suggestCycleLabel(), reset: '', confirm: '' }),
+  'cycle-ok': () => {
+    const m = app.ui.modal;
+    const word = m.mode === 'close' ? 'ENCERRAR' : 'INICIAR';
+    if (String(m.confirm || '').trim().toUpperCase() !== word) {
+      m.error = `Digite ${word} para confirmar.`;
+      return render();
+    }
+    try {
+      const f = financeSettings(app.db.settings);
+      const res = m.mode === 'close' ? closeCycle(f, { label: m.label }) : startCycle(f, { label: m.label, resetCashback: !!m.reset });
+      app.db.settings.finance = res.finance;
+      if (save()) {
+        app.ui.modal = null;
+        app.ui.rankCycle = null;
+        toast(res.message, 'ok', 6000);
       }
     } catch (e) {
       m.error = e.message;

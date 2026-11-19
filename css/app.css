@@ -23,6 +23,7 @@
   --ok: var(--abr-blue);
   --star: var(--abr-yellow);
   --star-edge: #9C7A00;
+  --star-empty: #CBD5E1; /* parte vazia da meia estrela: cinza neutro, bem diferente do amarelo */
   --vest-yellow: var(--abr-yellow);
   --vest-blue: var(--abr-blue);
   --vest-edge: #001A4D;
@@ -51,6 +52,7 @@
     --warn-bg: #3A2D10;
     --info-bg: #13244A;
     --star-edge: #00000000;
+    --star-empty: #4B5568;
     --vest-edge: #B9C6E6;
     --D: #5B9BFF;
     --M: #34C77B;
@@ -220,11 +222,12 @@ code { font: 13px ui-monospace, Consolas, monospace; background: var(--surface-2
 .pill.warn { background: var(--warn-bg); color: var(--warn); }
 
 /* estrelas (Amarelo Ouro com contorno para ler sobre fundo claro) */
-.stars { display: inline-flex; gap: 1px; flex: none; }
-.st { width: 15px; height: 15px; display: inline-block; background: var(--star); clip-path: polygon(50% 0, 61% 35%, 98% 35%, 68% 57%, 79% 91%, 50% 70%, 21% 91%, 32% 57%, 2% 35%, 39% 35%); }
+/* Estrelas na altura das etiquetas DEF/MEI/ATA; a margem negativa evita aumentar a altura da linha. */
+.stars { display: inline-flex; gap: 1px; flex: none; margin-block: -2px; vertical-align: middle; }
+.st { width: 18px; height: 18px; display: inline-block; background: var(--star); clip-path: polygon(50% 0, 61% 35%, 98% 35%, 68% 57%, 79% 91%, 50% 70%, 21% 91%, 32% 57%, 2% 35%, 39% 35%); }
 .stars { filter: drop-shadow(0 0 .5px var(--star-edge)) drop-shadow(0 0 .5px var(--star-edge)); }
-.st.half { background: linear-gradient(90deg, var(--star) 50%, color-mix(in srgb, var(--star) 25%, transparent) 50%); }
-.stars.sm .st { width: 12px; height: 12px; }
+.st.half { background: linear-gradient(90deg, var(--star) 50%, var(--star-empty) 50%); }
+.stars.sm .st { width: 14px; height: 14px; }
 
 /* funções */
 .role { display: inline-block; min-width: 34px; padding: 1px 5px; border-radius: 6px; font-size: 11px; font-weight: 800; text-align: center; color: #fff; flex: none; letter-spacing: .3px; }

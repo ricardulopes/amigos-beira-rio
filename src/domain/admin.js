@@ -26,7 +26,7 @@ export const ADMIN_ACTIONS = {
   settings: 'alterar os ajustes do grupo',
   'history-delete': 'excluir pelada do histórico',
   'pin-change': 'alterar o PIN mestre',
-  finance: 'registrar pagamentos do dia e aportes, configurar o Pix e zerar os lançamentos de teste',
+  finance: 'registrar pagamentos do dia e aportes, encerrar/iniciar ciclos, configurar o Pix e zerar os lançamentos de teste',
 };
 
 export function requiresAdmin(action) {

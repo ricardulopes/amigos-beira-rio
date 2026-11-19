@@ -3,7 +3,7 @@ import { app, activeSession } from './state.js';
 import { esc, fmt, stars, roleBadge, positionsBadges, starPicker, posBadge, vestIcon } from './dom.js';
 import {
   ROLE_NAMES, REMOVAL_REASONS, filterPlayers, allTeamsInOrder, queueLabel, simulateTransfer, teamStats, linePositions, PIN_RULES, ADMIN_ACTIONS, rosterPlanSummary,
-  vestOf, vestPreview, financeSettings, resetPreview, formatMoney,
+  vestOf, vestPreview, financeSettings, resetPreview, formatMoney, currentCycle, cycleRanking,
 } from '../domain/index.js';
 import { pixBlock } from './views.js';
 
@@ -59,6 +59,8 @@ export function renderModal() {
       return contribModal(m);
     case 'reset':
       return resetModal(m);
+    case 'cycle':
+      return cycleModal(m);
     case 'info':
       if (m.after) return shell(m.title, `<p>${esc(m.text)}</p><ul class="warn-list">${m.list.map((x) => `<li>${esc(x)}</li>`).join('')}</ul><p class="muted small">${esc(m.after)}</p>`, '<button class="btn primary" data-act="modal-close">Entendi</button>');
       return shell(m.title, `${m.list ? `<ul class="warn-list">${m.list.map((x) => `<li>${esc(x)}</li>`).join('')}</ul>` : ''}${m.text ? `<p>${esc(m.text)}</p>` : ''}`, '<button class="btn primary" data-act="modal-close">Entendi</button>');
@@ -177,6 +179,35 @@ function resetModal(m) {
     <p class="small">Não dá para desfazer. Se quiser guardar uma cópia, exporte o backup antes: <button class="btn small" data-act="export">⬇ Exportar backup</button></p>
     <label class="field"><span>Digite <b>ZERAR</b> para confirmar</span><input id="m-confirm" data-input="m:confirm" value="${esc(m.confirm || '')}" autocomplete="off" autocapitalize="characters"></label>`;
   return shell('Zerar lançamentos de teste', body, '<button class="btn" data-act="modal-close">Cancelar</button><button class="btn danger" data-act="reset-ok">Zerar tudo</button>', 'tall');
+}
+
+/** RN-128: encerrar o ciclo aberto ou iniciar o próximo, com palavra de confirmação. */
+function cycleModal(m) {
+  const closing = m.mode === 'close';
+  const word = closing ? 'ENCERRAR' : 'INICIAR';
+  let body;
+  if (closing) {
+    const f = financeSettings(app.db.settings);
+    const cur = currentCycle(f);
+    const total = cur ? cycleRanking(app.db.sessions, f, cur.id, 'line').total : 0;
+    body = `
+      <p>Encerra o ciclo aberto agora. O ranking dele (${total} jogo(s)) fica <b>fechado e guardado</b> para o sorteio do campeonato e o acerto do cashback/festa.</p>
+      <label class="field"><span>Nome do ciclo que está sendo encerrado</span><input id="m-clabel" data-input="m:label" value="${esc(m.label || '')}" maxlength="40" autocomplete="off"></label>
+      <p class="small">Peladas feitas depois do encerramento (na folga) entram no <b>próximo ciclo</b>, quando ele for iniciado.</p>`;
+  } else {
+    body = `
+      <p>Começa um ciclo novo a partir de agora: o ranking de presença (Top 32 linha / Top 4 goleiros) volta a contar do zero.</p>
+      <label class="field"><span>Nome do novo ciclo</span><input id="m-clabel" data-input="m:label" value="${esc(m.label || '')}" maxlength="40" autocomplete="off" placeholder="1º semestre de 2027"></label>
+      <div class="field"><span>Cashback</span><div class="seg">
+        <button type="button" class="${m.reset ? '' : 'on'}" data-act="m-set" data-k="reset" data-v="">Continua acumulando</button>
+        <button type="button" class="${m.reset ? 'on' : ''}" data-act="m-set" data-k="reset" data-v="1">Zerar (novo ano da festa)</button>
+      </div></div>
+      <p class="small">${m.reset ? 'O cashback de todos recomeça do zero neste ciclo. O do período anterior continua aparecendo no extrato de cada atleta para o acerto da festa.' : 'O cashback continua somando com o do ciclo anterior (ex.: do 1º para o 2º semestre).'}</p>`;
+  }
+  body = `${m.error ? `<div class="alert error">${esc(m.error)}</div>` : ''}${body}
+    <label class="field"><span>Digite <b>${word}</b> para confirmar</span><input id="m-confirm" data-input="m:confirm" value="${esc(m.confirm || '')}" autocomplete="off" autocapitalize="characters"></label>`;
+  return shell(closing ? 'Encerrar ciclo/semestre' : 'Iniciar novo ciclo/semestre', body,
+    `<button class="btn" data-act="modal-close">Cancelar</button><button class="btn ${closing ? 'danger' : 'primary'}" data-act="cycle-ok">${closing ? 'Encerrar ciclo' : 'Iniciar ciclo'}</button>`, 'tall');
 }
 
 // --------------------------------------------------------------- importação em lote

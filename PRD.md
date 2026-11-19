@@ -580,31 +580,48 @@ Pix e modo teste ficam nos ajustes do grupo (`app_state.settings.finance`), grav
   por pelada, **Pix**, **Cartão** (maquininha) ou **Isento**; sem marcação = pendente. Tocar de novo na forma
   marcada volta a pendente. O pagamento não é movimentação de jogo: não vai para o desfazer e desfazer um
   resultado não apaga pagamentos.
-- **RN-120 — Cashback.** Cada presença como linha soma **R$ 3** ao cashback do ano do atleta. Goleiros (e quem
+- **RN-120 — Cashback.** Cada presença como linha soma **R$ 3** ao cashback do período do atleta (RN-128). Goleiros (e quem
   quiser) acumulam por **aportes livres** lançados pelo admin (ex.: R$ 30, R$ 50). *Decisão:* o crédito de R$ 3
   vem da presença confirmada (pelada iniciada), mesmo com o pagamento pendente; a pendência aparece no extrato e
   no caixa do dia para cobrança. Se o dono quiser creditar só depois do pagamento, muda-se aqui.
-- **RN-121 — Semestres.** 1º semestre = janeiro a junho; 2º = julho a dezembro (data de início da pelada).
-  O ranking de presença **reinicia a cada semestre**; o cashback acumula o **ano inteiro**.
-- **RN-122 — Rankings.** "Ranking de Linha" e "Goleiros", por semestre: presenças, % = presenças ÷ jogos
-  realizados no semestre. Ordem: mais presenças; empate por nome (só para exibir). **Top 32** (linha) e
+- **RN-121 — Semestres (substituída por RN-128 em 2026-11-19).** Antes o ranking virava sozinho em 1º de
+  janeiro/1º de julho e o cashback no fim do ano. Agora o semestre é um **ciclo manual** (RN-128); o calendário
+  só serve para sugerir o nome do ciclo ("1º semestre de 2027").
+- **RN-122 — Rankings.** "Ranking de Linha" e "Goleiros", por ciclo: presenças, % = presenças ÷ jogos
+  realizados no ciclo. Ordem: mais presenças; empate por nome (só para exibir). **Top 32** (linha) e
   **Top 4** (goleiros) ficam destacados com a linha de corte da vaga prioritária no campeonato; empate exatamente
   na linha de corte é avisado (a decisão do desempate é dos organizadores).
-- **RN-123 — Festa de fim de ano (R$ 300).** Todo atleta abate o cashback do ano da taxa da festa de dezembro e
-  paga só a diferença; com R$ 300 ou mais, a festa aparece como quitada. O cashback zera na virada do ano
-  (conta só o ano corrente).
+- **RN-123 — Festa de fim de ano (R$ 300).** Todo atleta abate o cashback do período da taxa da festa e
+  paga só a diferença; com R$ 300 ou mais, a festa aparece como quitada. O cashback **só zera quando o admin
+  inicia um ciclo marcando "Zerar (novo ano da festa)"** (RN-128) — não zera mais sozinho na virada do ano.
 - **RN-124 — Extrato (livre para todos).** O atleta escolhe o próprio nome (lembrado no aparelho) e vê jogos do
-  semestre (linha e gol, com %), cashback do ano (presenças × R$ 3 + aportes), quanto falta para a festa,
-  pendências de pagamento e os lançamentos do ano.
+  ciclo aberto (na folga, do ciclo encerrado), com %, cashback do período (presenças × R$ 3 + aportes), quanto
+  falta para a festa, pendências de pagamento, os lançamentos do período, o cashback do período anterior (para o
+  acerto da festa depois de zerar) e quantos lançamentos da folga vão para o próximo ciclo.
 - **RN-125 — Pix da tesouraria.** O admin configura chave Pix, nome do recebedor, código "Copia e Cola"
   (começa com `000201`) e a imagem do QR Code (reduzida no aparelho para até 480 px). Todos veem e copiam
   em Caixa → Pix e no atalho 💠 da tela inicial.
 - **RN-126 — Permissões.** Ranking, extrato e Pix são livres (só leitura). Pagamentos do dia, aportes,
-  configuração do Pix e o reset exigem o PIN mestre (RN-114).
+  encerrar/iniciar ciclos, configuração do Pix e o reset exigem o PIN mestre (RN-114).
 - **RN-127 — Modo teste e reset.** O financeiro começa em **modo teste** (aviso na aba Caixa). Em Ajustes →
   Financeiro e Pix, o admin pode **zerar os lançamentos**: apaga todas as peladas (histórico, presenças,
   pagamentos) e os aportes, na nuvem e em todos os aparelhos; mantém cadastro, Pix e ajustes; exige digitar
-  ZERAR e que nenhuma pelada esteja em andamento. Depois disso o app entra no **ciclo oficial**.
+  ZERAR e que nenhuma pelada esteja em andamento. Depois disso o app entra no **ciclo oficial** (os ciclos
+  manuais recomeçam com um único ciclo aberto, RN-128).
+- **RN-128 — Ciclos manuais (encerrar/iniciar semestre).** Pedido do dono em 2026-11-19: o fechamento real da
+  pelada acontece semanas antes do campeonato/festa (sorteio dos times, cobrança de pendências, folga), então o
+  período é controlado à mão em Ajustes → Financeiro e Pix (PIN mestre):
+  - **Encerrar ciclo/semestre atual**: guarda a data de fim (pode renomear o ciclo, ex.: "2º semestre de 2026").
+    O ranking desse ciclo fica fechado e continua consultável em Caixa → Ranking (seletor de ciclos).
+  - **Iniciar novo ciclo/semestre**: só com o anterior encerrado; nome obrigatório e único (sugestão: o semestre
+    de daqui a um mês). Ranking e contagem de jogos recomeçam a partir dele.
+  - Ambos exigem digitar ENCERRAR / INICIAR para confirmar.
+  - *Decisão do dono:* pelada (ou aporte) feita **na folga** — depois do encerramento e antes do novo início —
+    **conta no próximo ciclo**. Até lá aparece como "⏳ Próximo" no ranking e como aviso no extrato.
+  - *Decisão do dono:* o cashback **zera só quando o admin mandar**: ao iniciar o ciclo, escolhe "Continua
+    acumulando" (ex.: do 1º para o 2º semestre) ou "Zerar (novo ano da festa)".
+  - Sem nenhum ciclo cadastrado existe um ciclo aberto implícito desde o início do ciclo oficial. Os ciclos ficam
+    em `settings.finance.cycles` (`{ id, label, start, end, resetCashback }`), sem mudança no banco.
 
 ---
 
@@ -625,7 +642,7 @@ Pix e modo teste ficam nos ajustes do grupo (`app_state.settings.finance`), grav
 
 ---
 
-## 18. Testes automatizados (cobertura atual: 141 testes)
+## 18. Testes automatizados (cobertura atual: 144 testes)
 
 Executar em `tests/index.html` (navegador) ou `node tests/run-node.mjs`.
 
@@ -638,7 +655,7 @@ Executar em `tests/index.html` (navegador) ou `node tests/run-node.mjs`.
 | `tests/cloud.test.js` | Visitante não grava (mudança sem admin é recusada e não entra na fila); banco unificado: diferenças entre versões, fila offline (sem duplicar, versão-base da primeira mudança, exclusões), pelada nova, mescla com a nuvem com e sem pendências, conversão de linhas |
 | `tests/admin.test.js` | Formato do PIN mestre, visitante só vê/compartilha/exporta × PIN mestre para qualquer alteração, sem código do jogador, acesso de 12 h; lista oficial embutida; leitura da lista em lote (formatos, "Felipe 2", erros), mesclar, X, jogador novo incompleto, ida e volta, substituir |
 | `tests/vests.test.js` | Coletes Amarelo/Azul: abertura, vitória de cada cor, sequência de vitórias, empate com saída dupla, empate com um só saindo, indicador neutro da PRO, prévia e explicação, WhatsApp, integridade (cores diferentes), migração de peladas antigas |
-| `tests/finance.test.js` | Financeiro (RN-118 a RN-127): dinheiro em centavos, R$ 18 = 15 + 3, presença só em pelada iniciada e com o tipo do snapshot, semestres, rankings com Top 32/Top 4 e empate no corte, cashback anual com virada do ano, aportes, festa quitada, extrato, pagamento puro (goleiro isento), resumo do caixa, Pix/QR validados, reset |
+| `tests/finance.test.js` | Financeiro (RN-118 a RN-128): dinheiro em centavos, R$ 18 = 15 + 3, presença só em pelada iniciada e com o tipo do snapshot, ciclos manuais (encerrar/iniciar, folga conta no próximo, ciclo encerrado consultável), rankings com Top 32/Top 4 e empate no corte, cashback que só zera quando o admin manda e período anterior no extrato, aportes, festa quitada, extrato, pagamento puro (goleiro isento), resumo do caixa, Pix/QR validados, reset |
 | `tests/isolation.test.js` | Visitante só lê: ações livres do app só de leitura/navegação, todo campo que altera dados exige PIN, nenhuma função do banco liberada sem ser de admin; o domínio não usa DOM/navegador/armazenamento, só importa a si mesmo, e interface/persistência/nuvem só o acessam por `src/domain/index.js`; nenhuma chave secreta do Supabase no app |
 
 **Não coberto por teste automatizado:** a execução do SQL e a conversa real com o Supabase. Conferido
