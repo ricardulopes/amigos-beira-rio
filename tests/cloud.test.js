@@ -6,6 +6,20 @@ const pl = (id, name, stars = 2, positions = ['M']) => ({ id, name, stars, type:
 const ses = (id, games = 0) => ({ id, title: id, status: 'live', games: Array.from({ length: games }, (_, n) => ({ n: n + 1 })) });
 const db = (over = {}) => ({ players: [], sessions: [], settings: { linePerTeam: 5 }, setup: null, activeSessionId: null, ...over });
 
+suite('Nuvem — visitante não grava (RN-116)', () => {
+  test('Mudança feita sem acesso de administrador é recusada e não entra na fila', async () => {
+    const sync = await import('../src/cloud/sync.js');
+    // Num navegador com admin logado (mesmo endereço do app), a regra não se aplica: não há o que testar.
+    if (sync.adminSession()) return;
+    const base = db({ players: [pl('a', 'Ari')] });
+    assert.ok(sync.track(base), 'a primeira cópia vira a referência');
+    const changed = db({ players: [pl('a', 'Ari', 3, ['A'])], settings: { linePerTeam: 7 } });
+    assert.equal(sync.track(changed), false, 'visitante não pode alterar');
+    assert.equal(sync.cloud.pending, 0, 'nada vai para a fila de envio');
+    assert.deepEqual(sync.baselineCopy(), base, 'a referência continua a de antes (o app desfaz a mudança)');
+  });
+});
+
 suite('Nuvem — diferenças e fila offline', () => {
   test('Detecta jogador novo, alterado e excluído; pelada nova, alterada e excluída; configurações', () => {
     const prev = db({ players: [pl('a', 'Ari'), pl('b', 'Branco')], sessions: [ses('s1'), ses('s2')] });

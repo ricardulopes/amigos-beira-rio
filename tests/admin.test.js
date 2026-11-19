@@ -1,7 +1,7 @@
 // Permissões com PIN mestre (RN-113 a RN-117) e importação da base em lote (RN-103 a RN-107).
 import { suite, test, assert } from './harness.js';
 import {
-  validatePinFormat, validatePlayerCode, validateOwnPositions, requiresAdmin, adminExpiry, isAdminActive, PIN_RULES, ADMIN_ACTIONS,
+  validatePinFormat, requiresAdmin, adminExpiry, isAdminActive, PIN_RULES, ADMIN_ACTIONS, PUBLIC_ACTIONS,
   parseRosterLine, parseRoster, planRosterImport, applyRosterImport, rosterPlanSummary, rosterText, validatePlayer, seedPlayers,
 } from '../src/domain/index.js';
 import { OFFICIAL_ROSTER } from '../src/data/lista-oficial.js';
@@ -13,7 +13,7 @@ function memBackend() {
   return { getItem: (k) => m.get(k) ?? null, setItem: (k, v) => m.set(k, String(v)), removeItem: (k) => m.delete(k), m };
 }
 
-suite('Permissões: PIN mestre e própria posição (RN-113 a RN-117)', () => {
+suite('Permissões: PIN mestre e visitante só leitura (RN-113 a RN-117)', () => {
   test('Formato do PIN: só números, 4 a 8 dígitos', () => {
     assert.equal(validatePinFormat('1234'), '1234');
     assert.equal(validatePinFormat('12345678'), '12345678');
@@ -23,30 +23,20 @@ suite('Permissões: PIN mestre e própria posição (RN-113 a RN-117)', () => {
     assert.throws(() => validatePinFormat(''), /só números/);
   });
 
-  test('Sem PIN só se vê, compartilha, exporta e troca a própria posição; o resto exige o PIN mestre', () => {
-    for (const a of ['view', 'share', 'export', 'own-positions']) assert.ok(!requiresAdmin(a), `${a} deveria ser livre`);
-    for (const a of ['draw', 'pelada', 'result', 'player-create', 'player-edit', 'player-delete', 'player-code', 'roster-import',
-      'backup-import', 'settings', 'history-delete', 'pin-change', 'qualquer-coisa', 'toString']) {
+  test('Visitante só vê, compartilha e exporta; qualquer alteração exige o PIN mestre (RN-116)', () => {
+    assert.deepEqual(Object.keys(PUBLIC_ACTIONS).sort(), ['export', 'share', 'view']);
+    for (const a of ['view', 'share', 'export']) assert.ok(!requiresAdmin(a), `${a} deveria ser livre`);
+    for (const a of ['draw', 'pelada', 'result', 'player-create', 'player-edit', 'player-delete', 'own-positions', 'player-code',
+      'roster-import', 'backup-import', 'settings', 'history-delete', 'pin-change', 'qualquer-coisa', 'toString']) {
       assert.ok(requiresAdmin(a), `${a} deveria exigir o PIN mestre`);
     }
     for (const a of Object.keys(ADMIN_ACTIONS)) assert.ok(requiresAdmin(a));
   });
 
-  test('Código do jogador: exatamente 4 números', () => {
-    assert.equal(validatePlayerCode(' 0427 '), '0427');
-    assert.throws(() => validatePlayerCode('427'), /4 números/);
-    assert.throws(() => validatePlayerCode('12345'), /4 números/);
-    assert.throws(() => validatePlayerCode('12a4'), /4 números/);
-  });
-
-  test('Própria posição: só jogador de linha, ao menos uma, só D/M/A, devolvidas na ordem D, M, A', () => {
-    const line = P('Ari', 2.5, 'line', ['D', 'M']);
-    assert.deepEqual(validateOwnPositions(line, ['A', 'D']), ['D', 'A']);
-    assert.deepEqual(validateOwnPositions(line, ['M', 'M']), ['M']);
-    assert.throws(() => validateOwnPositions(line, []), /ao menos uma/);
-    assert.throws(() => validateOwnPositions(line, ['G']), /inválida/);
-    assert.throws(() => validateOwnPositions(P('Jarbas', 2, 'gk'), ['D']), /Goleiro/);
-    assert.throws(() => validateOwnPositions(null, ['D']), /não encontrado/);
+  test('Não existe mais código do jogador nem troca da própria posição', () => {
+    assert.ok(!('codeLength' in PIN_RULES));
+    assert.ok(!('player-code' in ADMIN_ACTIONS));
+    assert.ok(!Object.values(PUBLIC_ACTIONS).some((t) => /posi|código/i.test(t)));
   });
 
   test('Acesso de administrador vale 12 horas', () => {

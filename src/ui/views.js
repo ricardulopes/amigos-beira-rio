@@ -99,7 +99,7 @@ export function playersView() {
         </li>`).join('') || '<li class="empty-row">Nenhum jogador encontrado.</li>'}
     </ul>
     ${admin ? '<button class="btn ghost wide" data-act="open-roster">⬆ Importar lista de atletas</button>' : ''}
-    <p class="muted small center">${admin ? '🔓 Administrador: toque num jogador para editar ou gerar o código dele.' : '👆 Toque no seu nome para alterar as suas posições (com o seu código de jogador). Cadastro e estrelas: só administradores 🔒.'}</p>
+    <p class="muted small center">${admin ? '🔓 Administrador: toque num jogador para editar.' : '👀 Toque num jogador para ver a ficha. Cadastro, estrelas e posições: só administradores 🔒.'}</p>
   </main>`;
 }
 
@@ -449,7 +449,7 @@ export function settingsView() {
 function adminSection() {
   const active = adminActive();
   const until = active ? new Date(adminUntil()).toLocaleString('pt-BR', { weekday: 'short', hour: '2-digit', minute: '2-digit' }) : '';
-  const status = active ? `🔓 Administrador neste aparelho até ${until}.` : '🔒 Você está como jogador: pode ver tudo e alterar só a sua posição.';
+  const status = active ? `🔓 Administrador neste aparelho até ${until}.` : '👀 Você está como visitante: vê tudo em tempo real, sem alterar nada.';
   return `<p class="small">${status}</p>
     <p class="muted small">O PIN mestre é único para os administradores da ABR e fica guardado no servidor. Ele libera: ${Object.values(ADMIN_ACTIONS).join('; ')}.
     Sem PIN: ${Object.values(PUBLIC_ACTIONS).join('; ')}.</p>

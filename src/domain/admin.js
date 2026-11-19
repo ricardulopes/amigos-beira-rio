@@ -1,31 +1,26 @@
 // Permissões no banco unificado (RN-98 a RN-102, revisadas na migração para a nuvem — RN-113 a RN-117).
-// Regras puras: quem pode fazer o quê, formato do PIN mestre e do código do jogador, validade do acesso
-// e validação da troca de posição feita pelo próprio jogador. A conferência do PIN e do código acontece
-// no servidor (Supabase); aqui não há hash nem segredo.
+// Regras puras: quem pode fazer o quê, formato do PIN mestre e validade do acesso. Visitante só lê
+// (RN-116); toda alteração exige o PIN mestre, conferido no servidor (Supabase). Aqui não há hash nem segredo.
 
-import { ROLES } from './constants.js';
-
-export const PIN_RULES = { minLength: 4, maxLength: 8, sessionHours: 12, codeLength: 4 };
+export const PIN_RULES = { minLength: 4, maxLength: 8, sessionHours: 12 };
 
 /**
- * Únicas operações livres para quem não é administrador (RN-114): ver tudo, compartilhar, exportar
- * backup e alterar a PRÓPRIA posição (com o código do jogador). Todo o resto exige o PIN mestre.
+ * Únicas operações livres para quem não é administrador (RN-114, RN-116): ver tudo, compartilhar e
+ * exportar backup. Nenhuma alteração; todo o resto exige o PIN mestre.
  */
 export const PUBLIC_ACTIONS = {
-  view: 'ver todas as abas',
+  view: 'ver todas as abas, times, sorteios, resultados e histórico',
   share: 'compartilhar no WhatsApp',
   export: 'exportar backup',
-  'own-positions': 'alterar a própria posição (com o código do jogador)',
 };
 
 /** O que o PIN mestre libera (texto da tela de Ajustes). */
 export const ADMIN_ACTIONS = {
   draw: 'selecionar presentes e sortear',
-  pelada: 'iniciar, registrar resultados, atrasados, retiradas, ajustes, desfazer e encerrar',
+  pelada: 'iniciar, registrar resultados, atrasados, retiradas, coletes, ajustes, desfazer e encerrar',
   'player-create': 'cadastrar jogador',
   'player-edit': 'editar nome, estrelas, tipo ou posições de qualquer jogador',
   'player-delete': 'excluir jogador',
-  'player-code': 'gerar o código de um jogador',
   'roster-import': 'importar lista de atletas',
   'backup-import': 'importar backup',
   settings: 'alterar os ajustes do grupo',
@@ -47,13 +42,6 @@ export function validatePinFormat(pin) {
   return p;
 }
 
-/** Código do jogador: exatamente 4 dígitos (RN-116). */
-export function validatePlayerCode(code) {
-  const c = String(code ?? '').trim();
-  if (!new RegExp(`^\\d{${PIN_RULES.codeLength}}$`).test(c)) throw new Error(`O código do jogador tem ${PIN_RULES.codeLength} números.`);
-  return c;
-}
-
 /** Acesso de administrador vale 12 h a partir do login (o servidor também confere). */
 export function adminExpiry(now = Date.now()) {
   return now + PIN_RULES.sessionHours * 60 * 60 * 1000;
@@ -61,18 +49,4 @@ export function adminExpiry(now = Date.now()) {
 
 export function isAdminActive(until, now = Date.now()) {
   return Number(until) > now;
-}
-
-/**
- * Troca de posição feita pelo próprio jogador (RN-116): só jogador de linha, ao menos uma posição,
- * apenas D/M/A. Retorna as posições na ordem D, M, A. Lança Error com mensagem amigável.
- */
-export function validateOwnPositions(player, positions) {
-  if (!player) throw new Error('Jogador não encontrado.');
-  if (player.type !== 'line') throw new Error('Goleiro não tem posição de linha para alterar.');
-  const set = new Set(positions || []);
-  for (const p of set) if (!ROLES.includes(p)) throw new Error(`Posição inválida: ${p}.`);
-  const out = ROLES.filter((p) => set.has(p));
-  if (!out.length) throw new Error('Escolha ao menos uma posição.');
-  return out;
 }

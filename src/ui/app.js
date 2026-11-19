@@ -8,11 +8,11 @@ import {
   validatePlayer, snapshotPlayer, playerDraft, togglePosition, prepareDraw, clampLinePerTeam, clampTolerance, clampTransferQty,
   createSession, redraw, startSession, finishSession, analyzeResult, registerResult, addLatePlayer, removePlayer,
   transferPlayers, movePlayerInOrder, swapPlayers, moveGoalkeeper, setPermanence, RuleError,
-  shareText, validatePinFormat, validatePlayerCode, validateOwnPositions, parseRoster, planRosterImport, applyRosterImport, rosterPlanSummary,
+  shareText, validatePinFormat, parseRoster, planRosterImport, applyRosterImport, rosterPlanSummary,
   rosterText,
 } from '../domain/index.js';
 import { OFFICIAL_ROSTER } from '../data/lista-oficial.js';
-import { initCloud, login, logout, changePin, newPlayerCode, setOwnPositions, rememberedCode, pullAll, flush, cloud } from '../cloud/sync.js';
+import { initCloud, login, logout, changePin, pullAll, flush, cloud } from '../cloud/sync.js';
 
 // ------------------------------------------------------------------ renderização
 
@@ -125,14 +125,14 @@ async function pinOk() {
 }
 
 /**
- * Ações livres para qualquer pessoa (RN-114): navegar, ver, filtrar, compartilhar, exportar e a ficha
- * do jogador (própria posição, com código). Também as que só mexem em janelas já liberadas.
- * Qualquer outra ação pede o PIN mestre antes de rodar.
+ * Ações livres para qualquer pessoa (RN-114, RN-116): navegar, ver, filtrar, compartilhar, exportar e
+ * abrir a ficha do jogador (só leitura). Também as que só mexem em janelas já liberadas pelo PIN.
+ * Visitante não altera nada: qualquer outra ação pede o PIN mestre antes de rodar.
  */
 const FREE_ACTIONS = new Set([
   'go', 'go-history', 'modal-close', 'modal-close-bg', 'pfilter', 'toggle-invert', 'toggle-queue', 'dismiss-exp', 'htab',
   'share', 'share-copy', 'share-wa', 'share-native', 'export', 'share-backup', 'open-log', 'open-more',
-  'admin-toggle', 'pin-ok', 'player-edit', 'self-pos', 'self-save', 'cloud-sync', 'wipe', 'confirm-ok',
+  'admin-toggle', 'pin-ok', 'player-edit', 'player-admin-edit', 'cloud-sync', 'wipe', 'confirm-ok',
   'm-set', 'm-qty', 'm-pos', 'm-type', 'pick', 'roster-official', 'roster-current', 'roster-preview',
 ]);
 
@@ -165,44 +165,6 @@ const actions = {
     await pullAll();
     await flush();
     toast(cloud.error ? cloud.error : 'Dados sincronizados com a nuvem.', cloud.error ? 'error' : 'ok', 5000);
-  },
-
-  // ---------- ficha do jogador: a própria posição, com o código (RN-116)
-  'self-pos': (d) => {
-    const m = app.ui.modal;
-    m.positions = togglePosition(m.positions, d.r);
-    m.error = '';
-    m.ok = '';
-    render();
-  },
-  'self-save': async () => {
-    const m = app.ui.modal;
-    if (!m || m.busy) return;
-    const p = app.db.players.find((x) => x.id === m.id);
-    try {
-      const positions = validateOwnPositions(p, m.positions);
-      const code = validatePlayerCode(m.code);
-      Object.assign(m, { busy: true, error: '', ok: '' });
-      render();
-      const saved = await setOwnPositions(p.id, code, positions);
-      Object.assign(m, { busy: false, positions: saved, ok: 'Posições salvas para todos os aparelhos.' });
-    } catch (e) {
-      Object.assign(m, { busy: false, error: e.message });
-    }
-    if (app.ui.modal === m) render();
-  },
-  'player-code': async () => {
-    const m = app.ui.modal;
-    if (!m?.id || m.busy) return;
-    try {
-      Object.assign(m, { busy: true, error: '' });
-      render();
-      m.code = await newPlayerCode(m.id);
-    } catch (e) {
-      m.error = e.message;
-    }
-    m.busy = false;
-    if (app.ui.modal === m) render();
   },
 
   // ---------- importação em lote (RN-103 a RN-107)
@@ -261,13 +223,18 @@ const actions = {
 
   // ---------- cadastro
   'player-new': (d) => withAdmin('player-create', () => openModal('player', { draft: playerDraft(), select: d.select === '1' })),
-  // Admin abre o cadastro completo; os demais, a ficha (ver dados e trocar a própria posição).
+  // Admin abre o cadastro completo; visitante, a ficha só de leitura (RN-116).
   'player-edit': (d) => {
     const p = app.db.players.find((x) => x.id === d.id);
     if (!p) return;
     if (adminActive()) openModal('player', { id: p.id, draft: playerDraft(p) });
-    else openModal('self', { id: p.id, positions: [...p.positions], code: rememberedCode(p.id), error: '', ok: '' });
+    else openModal('playerInfo', { id: p.id });
   },
+  // Botão "Editar" da ficha: pede o PIN mestre e só então abre o cadastro.
+  'player-admin-edit': (d) => withAdmin('player-edit', () => {
+    const p = app.db.players.find((x) => x.id === d.id);
+    if (p) openModal('player', { id: p.id, draft: playerDraft(p) });
+  }),
   pick: (d) => {
     app.ui.modal.draft[d.name] = Number(d.value);
     render();

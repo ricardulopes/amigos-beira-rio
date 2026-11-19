@@ -519,9 +519,10 @@ completam o 5º time; os dois seguintes abrem o 6º; o quinto atrasado entra no 
 
 ### 16.2 Banco unificado (Supabase) e PIN mestre (`supabase/schema.sql`, `src/cloud/`, `src/domain/admin.js`)
 
-Decisões do dono (2026-11-19): código por jogador para a própria posição; sem sinal, o admin continua
-e o app envia depois; a nuvem começa só com os 78 atletas da lista oficial (peladas antigas ficam no
-backup local).
+Decisões do dono (2026-11-19): sem sinal, o admin continua e o app envia depois; a nuvem começa só com
+os 78 atletas da lista oficial (peladas antigas ficam no backup local). A primeira versão tinha código
+por jogador para a própria posição; no mesmo dia o dono **simplificou**: visitante só lê, sem código,
+login ou senha, e toda alteração passa a exigir o PIN mestre (RN-116 reescrita).
 
 - **RN-113 — Banco unificado e PIN mestre.** Jogadores, peladas (atual e histórico, com equipes,
   campo, fila, coletes, jogos e registro), seleção de presentes, pelada ativa e ajustes ficam no
@@ -531,11 +532,11 @@ backup local).
   devolve um acesso válido por **12 horas** naquele aparelho, inclusive sem sinal. 5 erros seguidos
   bloqueiam por 30 s, dobrando até 5 min. "Sair do modo administrador" encerra o acesso; trocar o PIN
   derruba o acesso dos outros aparelhos.
-- **RN-114 — Quem pode o quê.** Sem PIN qualquer pessoa **vê todas as abas**, compartilha, exporta
-  backup e **altera só a própria posição** (RN-116). Todo o resto exige o PIN mestre: selecionar
+- **RN-114 — Quem pode o quê.** Sem PIN qualquer pessoa **vê todas as abas**, compartilha e exporta
+  backup, e **não altera nada** (RN-116). Todo o resto exige o PIN mestre: selecionar
   presentes e sortear, iniciar, resultados, atrasados, retiradas, transferências, ordem, trocas,
-  goleiros, permanência, desfazer, encerrar, cadastro, estrelas, posições de qualquer jogador, exclusões,
-  importações, ajustes, excluir histórico e trocar o PIN. A regra vale no servidor: o banco não aceita
+  goleiros, coletes, permanência, desfazer, encerrar, cadastro, estrelas, posições de qualquer jogador,
+  exclusões, importações, ajustes, excluir histórico e trocar o PIN. A regra vale no servidor: o banco não aceita
   gravação direta (RLS só de leitura) e as funções de gravação conferem o acesso de admin.
 - **RN-115 — Sem sinal e conflitos.** O aparelho mantém uma cópia local. Gravação de admin vai para
   uma fila e sobe assim que houver internet (tentativas a cada 20 s e ao voltar o sinal); a barra no
@@ -543,14 +544,13 @@ backup local).
   admins alteraram a mesma pelada sem sinal, **vale a de quem enviou primeiro**; o outro é avisado e a
   versão dele fica guardada no aparelho (`pelada.conflito.<id>`). Jogadores e ajustes: vale a última
   gravação.
-- **RN-116 — Própria posição com código.** Cada jogador de linha pode receber de um admin um **código de
-  4 números** (gerado no servidor; mostrado uma vez; gerar outro invalida o anterior). Tocando no próprio
-  nome em Jogadores, o jogador escolhe Defesa/Meio/Ataque (ao menos uma) e digita o código; o servidor
-  confere e grava **somente as posições** daquele jogador, para todos. Estrelas, nome e tipo não mudam
-  por esse caminho. 5 códigos errados bloqueiam o jogador por 10 min. Precisa de internet. O aparelho
-  lembra o código depois do primeiro acerto. Peladas já sorteadas não mudam (snapshot, RN-07).
-- **RN-117 — Tempo real.** Mudanças feitas por qualquer admin (ou posição alterada por um jogador)
-  aparecem nos outros aparelhos conectados na hora (Supabase Realtime), sem recarregar. Ao reconectar,
+- **RN-116 — Visitante só lê.** (Reescrita em 2026-11-19; substitui o "código do jogador".) Quem
+  abre o app sem PIN é **visitante**: vê em tempo real todas as abas, listas, times, sorteios, placares
+  e histórico, **sem digitar nada, sem login e sem senha**, e não altera nada — nem a própria posição.
+  Tocar num jogador abre a **ficha só de leitura**; o botão "Editar (admin)" pede o PIN mestre. Não há
+  código nem cadastro para jogadores. No servidor, nenhuma função de gravação é liberada sem o acesso de
+  admin; o `schema.sql` apaga a função e a tabela de códigos da versão anterior.
+- **RN-117 — Tempo real.** Mudanças feitas por qualquer admin aparecem nos outros aparelhos conectados na hora (Supabase Realtime), sem recarregar. Ao reconectar,
   o app baixa tudo de novo para não perder nada. Mudança pendente deste aparelho nunca é sobrescrita
   pelo que chega.
 
@@ -577,7 +577,7 @@ etapa de build, não há variáveis de ambiente no Vercel.
 
 ---
 
-## 18. Testes automatizados (cobertura atual: 124 testes)
+## 18. Testes automatizados (cobertura atual: 127 testes)
 
 Executar em `tests/index.html` (navegador) ou `node tests/run-node.mjs`.
 
@@ -587,13 +587,15 @@ Executar em `tests/index.html` (navegador) ou `node tests/run-node.mjs`.
 | `tests/operations.test.js` | Atrasados (exemplo dos 23), goleiro atrasado, aviso de desequilíbrio, retirada com reposição em cascata (campo, fila, último da fila, sem fila, equipe esvaziada, goleiro, permanência e rodízio depois da retirada), transferência, ordem, goleiros, integridade, transação, desfazer, estatísticas, cadastro, snapshot, backup, texto de compartilhamento |
 | `tests/draw.test.js` | Atribuição de função, planejamento de equipes, equilíbrio técnico e tático, equipe em formação, goleiros, ordem estratégica |
 | `tests/domain.test.js` | Cálculo de estrelas (validação, soma, média, mediana, amplitude, formatação), plano da pelada, aviso de goleiros, tolerância, limites, preparação do sorteio, dicas de empate, situação de vantagem, resumos |
-| `tests/cloud.test.js` | Banco unificado: diferenças entre versões, fila offline (sem duplicar, versão-base da primeira mudança, exclusões), pelada nova, mescla com a nuvem com e sem pendências, conversão de linhas |
-| `tests/admin.test.js` | Formato do PIN mestre, ações livres × PIN mestre, código do jogador, validação da própria posição, acesso de 12 h; lista oficial embutida; leitura da lista em lote (formatos, "Felipe 2", erros), mesclar, X, jogador novo incompleto, ida e volta, substituir |
+| `tests/cloud.test.js` | Visitante não grava (mudança sem admin é recusada e não entra na fila); banco unificado: diferenças entre versões, fila offline (sem duplicar, versão-base da primeira mudança, exclusões), pelada nova, mescla com a nuvem com e sem pendências, conversão de linhas |
+| `tests/admin.test.js` | Formato do PIN mestre, visitante só vê/compartilha/exporta × PIN mestre para qualquer alteração, sem código do jogador, acesso de 12 h; lista oficial embutida; leitura da lista em lote (formatos, "Felipe 2", erros), mesclar, X, jogador novo incompleto, ida e volta, substituir |
 | `tests/vests.test.js` | Coletes Amarelo/Azul: abertura, vitória de cada cor, sequência de vitórias, empate com saída dupla, empate com um só saindo, indicador neutro da PRO, prévia e explicação, WhatsApp, integridade (cores diferentes), migração de peladas antigas |
-| `tests/isolation.test.js` | O domínio não usa DOM/navegador/armazenamento, só importa a si mesmo, e interface/persistência/nuvem só o acessam por `src/domain/index.js`; nenhuma chave secreta do Supabase no app |
+| `tests/isolation.test.js` | Visitante só lê: ações livres do app só de leitura/navegação, todo campo que altera dados exige PIN, nenhuma função do banco liberada sem ser de admin; o domínio não usa DOM/navegador/armazenamento, só importa a si mesmo, e interface/persistência/nuvem só o acessam por `src/domain/index.js`; nenhuma chave secreta do Supabase no app |
 
-**Não coberto por teste automatizado:** o SQL (`supabase/schema.sql`) e a conversa real com o Supabase
-(login, gravação, Realtime, conflito entre dois aparelhos). Conferir manualmente depois de rodar o SQL.
+**Não coberto por teste automatizado:** a execução do SQL e a conversa real com o Supabase. Conferido
+à mão em 2026-11-19: login com PIN mestre, gravação de ajustes, Realtime entre duas conexões e recusa de
+gravação sem PIN. Ainda não conferidos: gravação de pelada (sorteio/resultados), fila sem sinal,
+conflito entre dois admins e Android real.
 
 ---
 

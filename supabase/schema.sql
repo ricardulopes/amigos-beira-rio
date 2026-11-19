@@ -10,8 +10,8 @@
 -- Segurança:
 --  * Qualquer pessoa com o app pode LER jogadores, peladas e ajustes (chave publicável).
 --  * Ninguém grava direto nas tabelas (RLS sem política de escrita). Toda gravação passa por funções
---    que conferem o acesso de administrador (token obtido com o PIN mestre) ou o código do jogador.
---  * PIN e códigos ficam só como hash bcrypt (pgcrypto), em tabelas que o app não consegue ler.
+--    que conferem o acesso de administrador (token obtido com o PIN mestre). Visitante só lê.
+--  * O PIN fica só como hash bcrypt (pgcrypto), em tabelas que o app não consegue ler.
 -- =====================================================================================================
 
 create extension if not exists pgcrypto with schema extensions;
@@ -91,13 +91,6 @@ create table if not exists public.admin_tokens (
   expires_at  timestamptz not null
 );
 
-create table if not exists public.player_codes (
-  player_id     text primary key references public.players (id) on delete cascade,
-  code_hash     text not null,
-  failures      integer not null default 0,
-  locked_until  timestamptz
-);
-
 -- ------------------------------------------------------------------------------------- RLS
 
 alter table public.players      enable row level security;
@@ -105,7 +98,6 @@ alter table public.peladas      enable row level security;
 alter table public.app_state    enable row level security;
 alter table public.admin_secret enable row level security;
 alter table public.admin_tokens enable row level security;
-alter table public.player_codes enable row level security;
 
 drop policy if exists "leitura publica" on public.players;
 drop policy if exists "leitura publica" on public.peladas;
@@ -116,7 +108,7 @@ create policy "leitura publica" on public.app_state for select to anon, authenti
 
 -- Tabelas públicas: só leitura. Privadas: nada (sem política = nada passa, e sem permissão).
 revoke insert, update, delete, truncate on public.players, public.peladas, public.app_state from anon, authenticated;
-revoke all on public.admin_secret, public.admin_tokens, public.player_codes from anon, authenticated;
+revoke all on public.admin_secret, public.admin_tokens from anon, authenticated;
 grant select on public.players, public.peladas, public.app_state, public.pelada_times, public.pelada_coletes to anon, authenticated;
 
 -- ------------------------------------------------------------------------------------- Realtime
@@ -261,54 +253,13 @@ begin
   where id = 1;
 end $$;
 
--- ------------------------------------------------------------------------------------- código do jogador
+-- ------------------------------------------------------------------------------------- código do jogador (removido)
 
--- Gera um código novo de 4 números para o jogador (o anterior deixa de valer). Mostrado uma vez ao admin.
-create or replace function public.admin_new_player_code(p_token uuid, p_player_id text)
-returns text language plpgsql security definer set search_path = public, extensions as $$
-declare
-  code text := lpad(((('x' || encode(gen_random_bytes(4), 'hex'))::bit(32)::bigint) % 10000)::text, 4, '0');
-begin
-  perform _require_admin(p_token);
-  if not exists (select 1 from players where id = p_player_id) then raise exception 'Jogador não encontrado.'; end if;
-  insert into player_codes (player_id, code_hash, failures, locked_until)
-  values (p_player_id, crypt(code, gen_salt('bf')), 0, null)
-  on conflict (player_id) do update set code_hash = excluded.code_hash, failures = 0, locked_until = null;
-  return code;
-end $$;
-
--- O próprio jogador altera SÓ as suas posições, com o código dele. 5 erros bloqueiam por 10 min.
-create or replace function public.player_set_positions(p_player_id text, p_code text, p_positions text[])
-returns jsonb language plpgsql security definer set search_path = public, extensions as $$
-declare
-  c player_codes;
-  pl players;
-  pos text[];
-begin
-  select * into pl from players where id = p_player_id;
-  if not found then return jsonb_build_object('ok', false, 'message', 'Jogador não encontrado.'); end if;
-  if pl.type <> 'line' then return jsonb_build_object('ok', false, 'message', 'Goleiro não tem posição de linha para alterar.'); end if;
-  select * into c from player_codes where player_id = p_player_id for update;
-  if not found then
-    return jsonb_build_object('ok', false, 'message', 'Este jogador ainda não tem código. Peça a um administrador.');
-  end if;
-  if c.locked_until is not null and c.locked_until > now() then
-    return jsonb_build_object('ok', false, 'message', 'Muitas tentativas erradas. Tente de novo em alguns minutos.');
-  end if;
-  if crypt(coalesce(p_code, ''), c.code_hash) <> c.code_hash then
-    update player_codes set failures = c.failures + 1,
-      locked_until = case when c.failures + 1 >= 5 then now() + interval '10 minutes' end
-    where player_id = p_player_id;
-    return jsonb_build_object('ok', false, 'message', 'Código incorreto.');
-  end if;
-  pos := array(select x from unnest(array['D','M','A']) x where x = any (p_positions));
-  if cardinality(pos) = 0 or exists (select 1 from unnest(p_positions) y where y not in ('D','M','A')) then
-    return jsonb_build_object('ok', false, 'message', 'Escolha ao menos uma posição (Defesa, Meio ou Ataque).');
-  end if;
-  update player_codes set failures = 0, locked_until = null where player_id = p_player_id;
-  update players set positions = pos, updated_at = now() where id = p_player_id;
-  return jsonb_build_object('ok', true, 'positions', to_jsonb(pos));
-end $$;
+-- Visitante só lê (RN-116, decisão de 2026-11-19): o código do jogador foi removido. Apaga o que
+-- versões anteriores deste arquivo criaram.
+drop function if exists public.player_set_positions(text, text, text[]);
+drop function if exists public.admin_new_player_code(uuid, text);
+drop table if exists public.player_codes;
 
 -- ------------------------------------------------------------------------------------- permissões das funções
 
@@ -322,8 +273,6 @@ revoke all on function public.admin_delete_players(uuid, text[])                
 revoke all on function public.admin_save_pelada(uuid, jsonb, integer)                from public;
 revoke all on function public.admin_delete_pelada(uuid, text)                        from public;
 revoke all on function public.admin_save_app_state(uuid, jsonb, jsonb, text)         from public;
-revoke all on function public.admin_new_player_code(uuid, text)                      from public;
-revoke all on function public.player_set_positions(text, text, text[])               from public;
 
 grant execute on function public.admin_login(text)                              to anon, authenticated;
 grant execute on function public.admin_logout(uuid)                             to anon, authenticated;
@@ -333,8 +282,6 @@ grant execute on function public.admin_delete_players(uuid, text[])             
 grant execute on function public.admin_save_pelada(uuid, jsonb, integer)        to anon, authenticated;
 grant execute on function public.admin_delete_pelada(uuid, text)                to anon, authenticated;
 grant execute on function public.admin_save_app_state(uuid, jsonb, jsonb, text) to anon, authenticated;
-grant execute on function public.admin_new_player_code(uuid, text)              to anon, authenticated;
-grant execute on function public.player_set_positions(text, text, text[])       to anon, authenticated;
 
 -- ------------------------------------------------------------------------------------- lista oficial (78)
 

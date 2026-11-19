@@ -46,8 +46,8 @@ export function renderModal() {
       return shareModal(m);
     case 'pin':
       return pinModal(m);
-    case 'self':
-      return selfModal(m);
+    case 'playerInfo':
+      return playerInfoModal(m);
     case 'roster':
       return rosterModal(m);
     case 'info':
@@ -74,10 +74,6 @@ function playerForm(m) {
     </div>
     <div class="field"><span>Classificação técnica</span>${starPicker('stars', d.stars)}<div class="center">${stars(d.stars)}</div></div>
     ${d.type === 'line' ? `<div class="field"><span>Posições (uma ou mais)</span><div class="chips">${posBtn('D')}${posBtn('M')}${posBtn('A')}</div></div>` : '<p class="muted small">Goleiros não precisam de posições de linha.</p>'}
-    ${m.id && d.type === 'line' ? `<div class="field"><span>Código do jogador</span>
-      ${m.code ? `<div class="alert ok">Código de <b>${esc(d.name)}</b>: <b class="code-big">${esc(m.code)}</b><br>Envie só para ele. O código anterior deixou de valer.</div>` : ''}
-      <button type="button" class="btn wide" data-act="player-code" ${m.busy ? 'disabled' : ''}>🔑 ${m.code ? 'Gerar outro código' : 'Gerar código do jogador'}</button>
-      <p class="muted small">Com o código, o próprio jogador troca as posições dele no app (sem PIN mestre). Precisa de internet.</p></div>` : ''}
   `;
   const footer = `${m.id ? '<button class="btn danger-ghost" data-act="player-delete">Excluir</button>' : ''}
     <button class="btn" data-act="modal-close">Cancelar</button>
@@ -105,26 +101,18 @@ function pinModal(m) {
   return shell(title, body, `<button class="btn" data-act="modal-close">Cancelar</button><button class="btn primary" data-act="pin-ok" ${m.busy ? 'disabled' : ''}>${ok}</button>`);
 }
 
-// --------------------------------------------------------------- ficha do jogador (própria posição, RN-116)
+// --------------------------------------------------------------- ficha do jogador (só leitura, RN-116)
 
-function selfModal(m) {
+function playerInfoModal(m) {
   const p = app.db.players.find((x) => x.id === m.id);
   if (!p) return shell('Jogador', '<p>Jogador não encontrado.</p>');
-  const posBtn = (r) => `<button type="button" class="chip big ${m.positions.includes(r) ? 'on' : ''}" data-act="self-pos" data-r="${r}" ${m.busy ? 'disabled' : ''}>${ROLE_NAMES[r]}</button>`;
-  const body = p.type !== 'line'
-    ? `<p><b>${esc(p.name)}</b> · 🧤 Goleiro ${stars(p.stars, 'sm')}</p><p class="muted small">Goleiro não tem posição de linha. Mudanças no cadastro: fale com um administrador.</p>`
-    : `
-    ${m.error ? `<div class="alert error">${esc(m.error)}</div>` : ''}
-    ${m.ok ? `<div class="alert ok">${esc(m.ok)}</div>` : ''}
+  const what = p.type === 'line' ? `Posições: ${p.positions.map((r) => ROLE_NAMES[r]).join(', ')}` : '🧤 Goleiro';
+  const body = `
     <p><b>${esc(p.name)}</b> ${stars(p.stars, 'sm')}</p>
-    <div class="field"><span>Minhas posições (uma ou mais)</span><div class="chips">${posBtn('D')}${posBtn('M')}${posBtn('A')}</div></div>
-    <label class="field"><span>Meu código de jogador (${PIN_RULES.codeLength} números)</span>
-      <input id="m-code" class="pin-input" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="${PIN_RULES.codeLength}" autocomplete="off" data-input="m:code" value="${esc(m.code || '')}" ${m.busy ? 'disabled' : ''}></label>
-    <p class="muted small">Só o próprio jogador muda a sua posição, com o código que recebeu de um administrador. Estrelas e nome: só administradores. A alteração vale para todos os aparelhos (precisa de internet).</p>`;
-  const footer = p.type !== 'line'
-    ? '<button class="btn primary" data-act="modal-close">Fechar</button>'
-    : `<button class="btn" data-act="modal-close">Fechar</button><button class="btn primary" data-act="self-save" ${m.busy ? 'disabled' : ''}>${m.busy ? 'Salvando…' : 'Salvar posições'}</button>`;
-  return shell('Ficha do jogador', body, footer);
+    <p>${esc(what)}</p>
+    <p class="muted small">Cadastro, estrelas e posições só são alterados por administradores (PIN mestre).</p>`;
+  return shell('Ficha do jogador', body,
+    `<button class="btn" data-act="player-admin-edit" data-id="${esc(p.id)}">🔒 Editar (admin)</button><button class="btn primary" data-act="modal-close">Fechar</button>`);
 }
 
 // --------------------------------------------------------------- importação em lote

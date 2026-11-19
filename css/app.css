@@ -93,7 +93,6 @@ h3 { font-size: 16px; }
 .cloud-bar { padding: 6px 12px; font-size: 13px; font-weight: 600; text-align: center; background: var(--warn-bg); color: var(--warn); }
 .cloud-bar.off { background: color-mix(in srgb, var(--danger) 12%, transparent); color: var(--danger); }
 .cloud-bar[data-act] { cursor: pointer; text-decoration: underline; }
-.code-big { font-size: 24px; letter-spacing: 4px; }
 .brand-logo { width: 36px; height: 40px; flex: none; object-fit: contain; filter: drop-shadow(0 1px 2px rgb(0 0 0 / 35%)); }
 .icon-btn { border: 0; background: transparent; color: inherit; font-size: 28px; line-height: 1; min-width: 44px; min-height: 44px; cursor: pointer; border-radius: 10px; }
 

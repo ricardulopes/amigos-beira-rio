@@ -18,7 +18,7 @@
 //   balance     avisos de desequilíbrio
 //   stats       desempenho e resumos
 //   share       texto para WhatsApp
-//   admin       permissões: ações públicas × PIN mestre, formato do PIN/código, própria posição
+//   admin       permissões: visitante só lê × PIN mestre para qualquer alteração, formato do PIN
 //   roster      importação da base de atletas em lote (lista em texto)
 
 export * from './constants.js';
@@ -42,6 +42,6 @@ export { balanceWarnings, BALANCE_THRESHOLDS } from './balance.js';
 export { playerStats, balanceSummary, gamesSummary, teamExitGroups } from './stats.js';
 export { shareText } from './share.js';
 export {
-  PIN_RULES, PUBLIC_ACTIONS, ADMIN_ACTIONS, requiresAdmin, validatePinFormat, validatePlayerCode, adminExpiry, isAdminActive, validateOwnPositions,
+  PIN_RULES, PUBLIC_ACTIONS, ADMIN_ACTIONS, requiresAdmin, validatePinFormat, adminExpiry, isAdminActive,
 } from './admin.js';
 export { parseRosterLine, parseRoster, planRosterImport, applyRosterImport, rosterPlanSummary, rosterText, seedPlayers } from './roster.js';

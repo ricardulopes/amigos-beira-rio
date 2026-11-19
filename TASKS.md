@@ -22,10 +22,13 @@ técnicos, no [CLAUDE.md](CLAUDE.md).
 - [x] Teste de isolamento: o domínio não usa DOM/navegador/armazenamento e a interface só o acessa por `index.js`.
 - [x] Servidor local em PowerShell (`tools/serve.ps1`) e geração de ícones (`tools/make-icons.ps1`).
 - [x] Documentação: README.md, PRD.md (112 regras), CLAUDE.md, TASKS.md.
-- [x] 124 testes automatizados passando (navegador e Node).
-- [x] Banco unificado no Supabase com PIN mestre, código do jogador, fila offline e Realtime (RN-113 a RN-117).
-- [ ] Rodar `supabase/schema.sql` no Supabase e definir o PIN mestre (dono).
-- [ ] Teste ponta a ponta com dois celulares (Realtime, sem sinal, conflito) depois do SQL.
+- [x] 127 testes automatizados passando (navegador e Node).
+- [x] Banco unificado no Supabase com PIN mestre, fila offline e Realtime (RN-113 a RN-117).
+- [x] Visitante só lê; toda alteração exige o PIN mestre; código do jogador removido (RN-116, 2026-11-19).
+- [x] Rodar `supabase/schema.sql` no Supabase e definir o PIN mestre (dono).
+- [x] Conferido no Supabase real: login, gravação de ajustes, Realtime, recusa sem PIN.
+- [ ] Rodar de novo o `supabase/schema.sql` para remover o código do jogador do banco (dono).
+- [ ] Teste ponta a ponta com dois celulares: pelada inteira (sorteio/resultados), sem sinal, conflito.
 
 ### Cadastro (RN-01 a RN-07)
 - [x] Cadastro com nome, estrelas (1 a 3, de 0,5 em 0,5), tipo (linha/goleiro) e posições (D, M, A).
@@ -120,4 +123,4 @@ técnicos, no [CLAUDE.md](CLAUDE.md).
 - [ ] 4.9 Confirmação de resultado em um toque com "desfazer" visível por alguns segundos (opção para quem quer mais rapidez).
 - [ ] 4.10 Revisão de acessibilidade: contraste no modo escuro, rótulos de leitores de tela, foco nos modais.
 - [ ] 4.11 🔶 Compartilhar os times como imagem (além do texto). Decidir se vale o esforço.
-- [ ] 4.12 🔶 Sincronização entre celulares (hoje: backup). Exige servidor/conta; decidir se entra no escopo.
+- [x] 4.12 Sincronização entre celulares: feita com o banco unificado no Supabase (RN-113 a RN-117).

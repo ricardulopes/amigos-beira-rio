@@ -5,7 +5,7 @@
 import { SUPABASE_URL, SUPABASE_KEY } from './config.js';
 import { emptyOutbox, outboxSize, diffDb, isEmptyDiff, addToOutbox, mergeRemote, rowToPlayer, playerToRow, appStateOf } from './diff.js';
 
-const K = { outbox: 'pelada.outbox', versions: 'pelada.versions', token: 'pelada.admin.token', codes: 'pelada.codigos' };
+const K = { outbox: 'pelada.outbox', versions: 'pelada.versions', token: 'pelada.admin.token' };
 const RETRY_MS = 20000;
 
 const read = (k, fallback) => {
@@ -25,6 +25,9 @@ const write = (k, v) => {
   }
 };
 const clone = (x) => JSON.parse(JSON.stringify(x));
+
+// Códigos de jogador foram removidos (RN-116: visitante só lê); apaga o que ficou de versões anteriores.
+write('pelada.codigos', null);
 
 let client = null;
 let hooks = null; // { getDb, setDb, cache, onStatus }
@@ -110,34 +113,6 @@ export async function changePin(newPin) {
   const t = adminSession();
   if (!t) throw new Error('Entre com o PIN atual primeiro.');
   await rpc('admin_change_pin', { p_token: t.token, p_new_pin: newPin });
-}
-
-/** Gera um código novo de 4 números para o jogador (o anterior deixa de valer). */
-export async function newPlayerCode(playerId) {
-  const t = adminSession();
-  if (!t) throw new Error('Entre com o PIN de administrador.');
-  if (ob.players.includes(playerId)) await flush();
-  return rpc('admin_new_player_code', { p_token: t.token, p_player_id: playerId });
-}
-
-// ------------------------------------------------------------------ própria posição (jogador comum)
-
-export function rememberedCode(playerId) {
-  return read(K.codes, {})[playerId] || '';
-}
-
-/** O jogador altera só as próprias posições, com o código dele (RN-116). Precisa de internet. */
-export async function setOwnPositions(playerId, code, positions) {
-  const res = await rpc('player_set_positions', { p_player_id: playerId, p_code: code, p_positions: positions });
-  if (!res?.ok) throw new Error(res?.message || 'Não foi possível salvar.');
-  const codes = read(K.codes, {});
-  codes[playerId] = code;
-  write(K.codes, codes);
-  applyRemote((db) => {
-    const p = db.players.find((x) => x.id === playerId);
-    if (p) p.positions = res.positions;
-  });
-  return res.positions;
 }
 
 // ------------------------------------------------------------------ gravação local → fila

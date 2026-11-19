@@ -61,16 +61,17 @@ O app mostra o colete (dupla-face) de cada equipe em campo:
 - O time **PRO** mostra um colete metade amarelo/metade azul ("entra com o colete de quem sair") até o
   resultado; a confirmação do resultado já diz as cores da próxima partida.
 
-## Administradores (PIN mestre) e jogadores
+## Administradores (PIN mestre) e visitantes
 
-- **Qualquer pessoa** vê todas as abas, compartilha e exporta backup. Para mudar **as próprias posições**
-  (Defesa/Meio/Ataque): **Jogadores → tocar no próprio nome**, escolher as posições e digitar o
-  **código de jogador** (4 números) que um administrador passou. Vale para todos os celulares.
+- **Visitantes (qualquer pessoa):** só leitura. Veem em tempo real todas as abas, a lista de jogadores,
+  times, sorteios, resultados e o histórico, sem login, senha ou código. Podem compartilhar no WhatsApp
+  e exportar backup. Tocar num jogador mostra a ficha dele, sem edição.
 - **Administradores** entram com o **PIN mestre** único da ABR (botão 🔒 em Jogadores ou Ajustes; precisa
-  de internet). O acesso dura 12 horas no aparelho, inclusive sem sinal no campo. Só eles sorteiam,
-  registram resultados, mexem na partida, cadastram, mudam estrelas, importam e alteram ajustes.
-- **Código do jogador:** admin → Jogadores → tocar no jogador → **🔑 Gerar código do jogador**. O código
-  aparece uma vez; gerar outro invalida o anterior.
+  de internet). O acesso dura 12 horas no aparelho, inclusive sem sinal no campo. Só eles alteram
+  qualquer coisa: cadastrar e excluir jogadores, estrelas, posições, presentes, sorteio, iniciar e
+  encerrar a pelada, resultados, coletes, atrasados, lesões, ajustes e importações.
+- **Atualizar o banco:** se o `supabase/schema.sql` já foi rodado numa versão anterior, rode-o de novo
+  (ele remove o antigo código do jogador; o PIN mestre e os dados continuam).
 - **Sem sinal:** o admin continua usando o app; as alterações ficam na fila (barra no topo) e sobem
   sozinhas quando o sinal voltar. Se outro admin mexeu na mesma pelada antes, vale a versão dele e você
   é avisado.
@@ -104,7 +105,7 @@ src/domain/       Regras de negócio puras — sem interface, sem navegador, tes
   adjustments.js  Transferência, ordem, troca, goleiros
   balance.js      Avisos de desequilíbrio      stats.js  Desempenho e resumos
   share.js        Texto para WhatsApp          constants.js / rng.js
-  admin.js        Permissões (PIN mestre × livre), código e própria posição
+  admin.js        Permissões: visitante só lê × PIN mestre para alterar
   roster.js       Importação da base em lote
 src/storage/      Cópia local versionada, pilha de desfazer (40 passos), exportar/importar
 src/cloud/        Supabase: carga, Realtime, fila offline, login de admin (sync.js); parte pura (diff.js)
@@ -167,4 +168,3 @@ mesmo com PRO e RE completos**.
 
 ## Previsto para o futuro
 - Bloquear jogadores em equipes específicas antes de um novo sorteio.
-- Sincronização entre aparelhos (hoje: exportar/importar backup).
