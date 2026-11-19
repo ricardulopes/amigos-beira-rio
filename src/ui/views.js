@@ -6,6 +6,8 @@ import {
   filterPlayers, ROLE_NAMES, REMOVAL_REASONS, STAR_VALUES, LIMITS, planParticipation, toleranceInfo, defaultTitle as domainDefaultTitle,
   ADMIN_ACTIONS, PUBLIC_ACTIONS, allTeamsInOrder, queueLabel, teamStats, isComplete, linePositions, playerStats, balanceSummary, gamesSummary, teamExitGroups, drawHint, advantageStatus,
   vestOf, vestName, incomingVest,
+  financeSettings, semestersAvailable, semesterRanking, semesterLabel, statement, paymentSummary, formatMoney, PAYMENT_METHODS, FINANCE_RULES,
+  groupCashback, attendanceRecords,
 } from '../domain/index.js';
 
 export const CLUB_NAME = 'Amigos Beira Rio';
@@ -30,6 +32,7 @@ export function tabbar() {
     ${tab('/', 'home', 'Início')}
     ${tab('/jogadores', 'users', 'Jogadores')}
     ${tab(s ? '/partida' : '/nova', 'ball', 'Pelada', s && s.status === 'live' ? '<i class="live-dot"></i>' : '')}
+    ${tab('/caixa', 'coin', 'Caixa')}
     ${tab('/historico', 'clock', 'Histórico')}
     ${tab('/ajustes', 'gear', 'Ajustes')}
   </nav>`;
@@ -69,6 +72,8 @@ export function homeView() {
       <a class="tile" href="#/jogadores"><b>${db.players.length}</b><span>jogadores cadastrados (${lines} linha · ${gks} goleiros)</span></a>
       <a class="tile" href="#/historico"><b>${finished.length}</b><span>peladas no histórico</span></a>
       <a class="tile" href="#/ajustes"><b>Backup</b><span>Exportar / importar dados</span></a>
+      <a class="tile" href="#/caixa" data-act="ftab" data-tab="ranking"><b>🏆 Ranking</b><span>Presenças, extrato e cashback</span></a>
+      <button class="tile" data-act="pix-open"><b>💠 Pix</b><span>Chave e QR Code da tesouraria</span></button>
     </div>
     ${db.players.length === 0 ? `<div class="card empty"><b>Comece cadastrando os jogadores.</b><p>Cada jogador tem nome, estrelas (1 a 3) e posições. Goleiros ficam numa categoria separada.</p><button class="btn primary" data-act="player-new">Cadastrar primeiro jogador</button></div>` : ''}
   </main>`;
@@ -283,6 +288,7 @@ export function draftView(s) {
       <button class="btn" data-act="open-transfer">Simular transferência</button>
       <button class="btn" data-act="open-late">+ Atrasado</button>
       <button class="btn" data-act="share">Compartilhar</button>
+      <button class="btn" data-act="go-caixa">💰 Pagamentos</button>
       <button class="btn danger-ghost" data-act="discard-draft">Descartar</button>
     </div>
     ${teams.map((t) => teamCard(s, t)).join('')}
@@ -398,6 +404,150 @@ export function historyDetailView(id) {
   </main>`;
 }
 
+// ------------------------------------------------------------------ caixa: ranking, extrato, Pix, pagamentos, aportes (RN-118 a RN-127)
+
+const dateShort = (iso) => new Date(iso).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: '2-digit' });
+
+export function financeView() {
+  const admin = adminActive();
+  const f = financeSettings(app.db.settings);
+  let tab = app.ui.financeTab || 'ranking';
+  if (!admin && (tab === 'caixa' || tab === 'aportes')) tab = 'ranking';
+  const t = (k, l) => `<button class="chip ${tab === k ? 'on' : ''}" data-act="ftab" data-tab="${k}">${l}</button>`;
+  const lock = `<button class="btn small admin-chip ${admin ? 'on' : ''}" data-act="admin-toggle" aria-label="${admin ? 'Bloquear modo administrador' : 'Entrar no modo administrador'}">${admin ? '🔓' : '🔒'}</button>`;
+  const body = { extrato: statementTab, pix: pixTab, caixa: cashTab, aportes: contributionsTab }[tab] || rankingTab;
+  return `${header('Caixa e ranking', { right: lock })}
+  <main class="page">
+    ${f.mode === 'test' ? '<div class="alert warn small">🧪 Modo teste: presenças, pagamentos e aportes já valem para conferir, mas serão zerados antes do ciclo oficial.</div>' : ''}
+    <div class="chips scroll-x">${t('ranking', '🏆 Ranking')}${t('extrato', '📄 Extrato')}${t('pix', '💠 Pix')}${admin ? t('caixa', '💰 Caixa do dia') + t('aportes', '➕ Aportes') : ''}</div>
+    ${body(f, admin)}
+  </main>`;
+}
+
+function rankingTab() {
+  const sems = semestersAvailable(app.db.sessions);
+  const sem = sems.find((x) => `${x.year}-${x.half}` === app.ui.rankSem) || sems[0];
+  const type = app.ui.rankType === 'gk' ? 'gk' : 'line';
+  const r = semesterRanking(app.db.sessions, sem, type);
+  const seg = `<div class="seg"><button class="${type === 'line' ? 'on' : ''}" data-act="frank" data-v="line">Ranking de Linha</button><button class="${type === 'gk' ? 'on' : ''}" data-act="frank" data-v="gk">🧤 Goleiros</button></div>`;
+  const semChips = sems.length > 1
+    ? `<div class="chips scroll-x">${sems.map((x) => `<button class="chip ${x === sem ? 'on' : ''}" data-act="fsem" data-v="${x.year}-${x.half}">${x.half}º sem. ${x.year}</button>`).join('')}</div>`
+    : '';
+  const rows = [];
+  r.rows.forEach((x, i) => {
+    if (i === r.top) rows.push(`<tr class="cut"><td colspan="4">✂ Linha de corte — Top ${r.top} com vaga prioritária no campeonato</td></tr>`);
+    rows.push(`<tr class="${x.qualified ? 'q' : ''}" data-act="stmt-pick" data-id="${esc(x.pid)}"><td class="num">${x.position}º</td><td>${esc(x.name)}</td><td class="num">${x.count}</td><td class="num">${x.pct}%</td></tr>`);
+  });
+  return `${seg}${semChips}
+    <p class="small rank-head"><b>${r.total}</b> jogo(s) realizados no ${semesterLabel(sem)} · <b>Top ${r.top}</b> ${type === 'gk' ? 'goleiros' : 'de linha'} com vaga prioritária.</p>
+    ${r.rows.length
+    ? `<table class="tbl rank"><thead><tr><th class="num">#</th><th>Atleta</th><th class="num">Jogos</th><th class="num">%</th></tr></thead><tbody>${rows.join('')}</tbody></table>`
+    : '<div class="card empty">Nenhuma presença neste semestre ainda. Contam as peladas iniciadas no app.</div>'}
+    ${r.cutTie ? `<p class="alert warn small">Empate na linha de corte: o ${r.top}º e o ${r.top + 1}º têm o mesmo número de jogos (ordem alfabética só para exibir).</p>` : ''}
+    <p class="muted small">% = presenças ÷ jogos realizados no semestre. O ranking reinicia a cada semestre; o cashback acumula o ano inteiro. Toque num atleta para ver o extrato.</p>`;
+}
+
+function statementTab(f) {
+  const pid = app.ui.stmtPid;
+  const known = new Map(app.db.players.map((p) => [p.id, p.name]));
+  for (const r of attendanceRecords(app.db.sessions)) if (!known.has(r.pid)) known.set(r.pid, r.name);
+  if (!pid || !known.has(pid)) {
+    const q = (app.ui.financeQuery || '').trim().toLowerCase();
+    const list = [...known].map(([id, name]) => ({ id, name })).filter((x) => !q || x.name.toLowerCase().includes(q)).sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'));
+    return `<p class="small">Escolha seu nome para ver jogos, cashback e quanto falta para a festa.</p>
+      <input id="fsearch" class="search" type="search" placeholder="Pesquisar atleta" value="${esc(app.ui.financeQuery || '')}" data-input="fsearch" autocomplete="off">
+      <ul class="list">${list.map((x) => `<li class="row" data-act="stmt-pick" data-id="${esc(x.id)}"><div class="grow name">${esc(x.name)}</div><span class="chev">›</span></li>`).join('') || '<li class="empty-row">Nenhum atleta encontrado.</li>'}</ul>`;
+  }
+  const st = statement(pid, app.db.sessions, f);
+  const c = st.cashback;
+  const sem = st.semester;
+  const pay = (m) => (m ? PAYMENT_METHODS[m] : '<span class="warn-text">pendente</span>');
+  const entries = st.entries.map((e) => e.kind === 'game'
+    ? `<li><span class="muted">${dateShort(e.date)}</span> ${esc(e.title)} · ${e.type === 'gk' ? '🧤 gol' : 'linha'} · ${pay(e.payment)}<b class="amt">${e.cents ? `+${formatMoney(e.cents)}` : '—'}</b></li>`
+    : `<li><span class="muted">${dateShort(e.date)}</span> ${esc(e.title)}<b class="amt">+${formatMoney(e.cents)}</b></li>`).join('');
+  return `<div class="card stmt">
+      <div class="stmt-name"><b>${esc(known.get(pid))}</b><button class="btn small ghost" data-act="stmt-clear">Trocar</button></div>
+      <div class="counters c3">
+        <div><b>${sem.line}<small>/${sem.total}</small></b><span>jogos de linha · ${sem.linePct}%</span></div>
+        <div><b>${sem.gk}</b><span>jogos no gol</span></div>
+        <div><b>${formatMoney(c.total).replace('R$ ', '')}</b><span>cashback ${c.year} (R$)</span></div>
+      </div>
+      <p class="small">${semesterLabel(sem)} · ${sem.total} jogo(s) realizados.</p>
+      <p class="small">Cashback do ano: ${c.lineGames} presença(s) × ${formatMoney(FINANCE_RULES.cashbackPerGame)} = <b>${formatMoney(c.lineCents)}</b>${c.contribCents ? ` + aportes <b>${formatMoney(c.contribCents)}</b>` : ''}.</p>
+      <div class="party ${c.partyPaid ? 'paid' : ''}">🎉 Festa de fim de ano (${formatMoney(c.partyFee)}): ${c.partyPaid ? '<b>quitada com o cashback!</b>' : `falta <b>${formatMoney(c.partyRemaining)}</b>`}</div>
+      ${st.pending ? `<p class="alert warn small">${st.pending} pelada(s) sem pagamento registrado.</p>` : ''}
+      <button class="btn primary wide" data-act="pix-open">💠 Pagar com Pix</button>
+    </div>
+    <h2 class="section-title">Lançamentos de ${c.year}</h2>
+    ${entries ? `<ul class="plain small stmt-list">${entries}</ul>` : '<p class="muted">Nenhum lançamento neste ano.</p>'}
+    <p class="muted small">Linha: ${formatMoney(FINANCE_RULES.lineFee)} por pelada (${formatMoney(FINANCE_RULES.operational)} operacional + ${formatMoney(FINANCE_RULES.cashbackPerGame)} de cashback). Goleiro: isento, cashback por aportes livres. O cashback zera na virada do ano.</p>`;
+}
+
+/** Bloco do Pix da tesouraria (aba e janela rápida). */
+export function pixBlock(f) {
+  if (!f.pixKey && !f.pixCopyPaste && !f.qrImage) return '<div class="card empty">A tesouraria ainda não cadastrou o Pix. Um administrador configura em Ajustes → Financeiro e Pix.</div>';
+  return `<div class="card pix-card">
+    ${f.qrImage ? `<img class="pix-qr" src="${esc(f.qrImage)}" alt="QR Code Pix da tesouraria">` : ''}
+    ${f.pixName ? `<p class="center"><b>${esc(f.pixName)}</b></p>` : ''}
+    ${f.pixKey ? `<div class="field"><span>Chave Pix</span><div class="copy-row"><code>${esc(f.pixKey)}</code><button class="btn small" data-act="pix-copy" data-k="key">Copiar</button></div></div>` : ''}
+    ${f.pixCopyPaste ? `<div class="field"><span>Pix Copia e Cola</span><div class="copy-row"><code class="cc">${esc(f.pixCopyPaste)}</code><button class="btn small primary" data-act="pix-copy" data-k="cc">Copiar</button></div></div>` : ''}
+    <p class="muted small">Pelada (linha): ${formatMoney(FINANCE_RULES.lineFee)}. Goleiros são isentos; aportes de cashback são livres.</p>
+  </div>`;
+}
+
+function pixTab(f, admin) {
+  return `${pixBlock(f)}${admin ? '<button class="btn wide" data-act="pix-edit">⚙️ Configurar Pix e QR Code</button>' : ''}`;
+}
+
+function cashTab() {
+  const list = app.db.sessions.slice().sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  if (!list.length) return '<div class="card empty">Nenhuma pelada ainda. Faça o sorteio; os pagamentos do dia aparecem aqui.</div>';
+  const s = list.find((x) => x.id === app.ui.paySid) || activeSession() || list[0];
+  const p = paymentSummary(s);
+  const chips = list.slice(0, 8).map((x) => `<button class="chip ${x.id === s.id ? 'on' : ''}" data-act="fpay-pick" data-id="${esc(x.id)}">${dateShort(x.createdAt)}${x.status === 'live' ? ' ●' : ''}</button>`).join('');
+  const row = (r) => (r.type === 'gk'
+    ? `<li class="pay-row"><span class="name">🧤 ${esc(r.name)}</span><span class="pill">Isento (goleiro)</span><button class="btn small" data-act="contrib-new" data-pid="${esc(r.pid)}">+ Aporte</button></li>`
+    : `<li class="pay-row ${r.method ? '' : 'pending'}"><span class="name">${esc(r.name)}</span><div class="pay-chips">${Object.keys(PAYMENT_METHODS)
+      .map((m) => `<button class="chip ${r.method === m ? 'on' : ''}" data-act="pay-set" data-sid="${esc(s.id)}" data-pid="${esc(r.pid)}" data-m="${r.method === m ? '' : m}">${PAYMENT_METHODS[m]}</button>`).join('')}</div></li>`);
+  return `<div class="chips scroll-x">${chips}</div>
+    <p class="small"><b>${esc(s.title)}</b>${s.status === 'draft' ? ' · <span class="warn-text">sorteio ainda não iniciado (a presença conta quando a pelada começa)</span>' : ''}</p>
+    <section class="counters">
+      <div><b>${p.pix}</b><span>Pix</span></div><div><b>${p.card}</b><span>Cartão</span></div>
+      <div><b>${p.pending}</b><span>pendentes</span></div><div><b>${p.exempt}</b><span>isentos</span></div>
+    </section>
+    <p class="small">Recebido: <b>${formatMoney(p.collected)}</b> de ${formatMoney(p.expected)} · ${formatMoney(p.operational)} operacional + ${formatMoney(p.cashbackRetained)} de cashback.</p>
+    <ul class="list pay-list">${p.rows.map(row).join('')}</ul>
+    <p class="muted small">Toque de novo na forma marcada para voltar a "pendente". Cada presença de linha soma ${formatMoney(FINANCE_RULES.cashbackPerGame)} ao cashback do atleta.</p>`;
+}
+
+function contributionsTab(f) {
+  const year = new Date().getFullYear();
+  const g = groupCashback(app.db.sessions, f, year);
+  const list = f.contributions.filter((c) => new Date(c.at).getFullYear() === year).sort((a, b) => b.at.localeCompare(a.at));
+  return `<section class="counters c3">
+      <div><b>${formatMoney(g.line).replace('R$ ', '')}</b><span>cashback linha (R$)</span></div>
+      <div><b>${formatMoney(g.contrib).replace('R$ ', '')}</b><span>aportes (R$)</span></div>
+      <div><b>${formatMoney(g.total).replace('R$ ', '')}</b><span>total ${year} (R$)</span></div>
+    </section>
+    <button class="btn primary wide" data-act="contrib-new">➕ Lançar aporte livre</button>
+    <h2 class="section-title">Aportes de ${year}</h2>
+    ${list.length ? `<ul class="list">${list.map((c) => `<li class="row"><div class="grow"><div class="name">${esc(c.name)} · ${formatMoney(c.cents)}</div><div class="muted small">${dateShort(c.at)}${c.note ? ` · ${esc(c.note)}` : ''}</div></div><button class="btn small danger-ghost" data-act="contrib-del" data-id="${esc(c.id)}" aria-label="Excluir aporte">✕</button></li>`).join('')}</ul>` : '<p class="muted">Nenhum aporte lançado neste ano.</p>'}
+    <p class="muted small">Aportes livres (ex.: R$ 30, R$ 50) somam ao cashback do ano do atleta — usado principalmente pelos goleiros, isentos da taxa de jogo.</p>`;
+}
+
+function financeSection() {
+  const f = financeSettings(app.db.settings);
+  const mode = f.mode === 'test'
+    ? '🧪 Modo teste ligado: presenças, pagamentos e aportes estão sendo registrados para conferência.'
+    : `✅ Ciclo oficial${f.cycleStart ? ` desde ${dateShort(f.cycleStart)}` : ''}.`;
+  return `<p class="small">${mode}</p>
+    <p class="muted small">Pix: ${f.pixKey || f.pixCopyPaste ? 'configurado' : 'não configurado'}${f.qrImage ? ' · com QR Code' : ''}.</p>
+    ${adminActive()
+    ? `<button class="btn wide" data-act="pix-edit">⚙️ Configurar Pix e QR Code</button>
+       <button class="btn danger-ghost wide" data-act="reset-open">🧹 Zerar lançamentos de teste</button>`
+    : '<p class="muted small">Só administradores configuram o Pix e zeram os lançamentos.</p>'}`;
+}
+
 // ------------------------------------------------------------------ ajustes
 
 export function settingsView() {
@@ -426,6 +576,10 @@ export function settingsView() {
     <section class="card">
       <h3>Banco na nuvem</h3>
       ${cloudSection()}
+    </section>
+    <section class="card">
+      <h3>Financeiro e Pix</h3>
+      ${financeSection()}
     </section>
     <section class="card">
       <h3>Modo administrador</h3>

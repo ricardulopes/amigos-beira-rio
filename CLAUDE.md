@@ -62,6 +62,8 @@ src/domain/    REGRAS DE NEGÓCIO PURAS. Sem DOM, sem navegador, sem armazenamen
   share.js       texto para WhatsApp
   admin.js       permissões: visitante só lê × PIN mestre para qualquer alteração, formato do PIN
   roster.js      importação da base em lote: leitura da lista, plano (criar/atualizar/excluir), aplicação
+  finance.js     presenças, pagamento do dia (session.payments), cashback, aportes/Pix/modo teste
+                 (settings.finance), rankings semestrais (Top 32/Top 4), extrato, reset (RN-118 a RN-127)
 src/storage/   persistência (storage.js): esquema, pilha de desfazer, exportar/importar backup
 src/ui/        APRESENTAÇÃO E ORQUESTRAÇÃO
   state.js       estado da UI, save(), sessão ativa, modal, toast, navegação
@@ -151,10 +153,10 @@ tests/         harness próprio + suítes (*.test.js) + runner de navegador e de
 ## Testes (obrigatório)
 
 - Toda mudança em regra de negócio exige teste novo ou atualizado em `tests/` **antes** de considerar
-  pronto, e toda a suíte precisa passar (hoje: 127 testes). Testes do domínio importam de
+  pronto, e toda a suíte precisa passar (hoje: 141 testes). Testes do domínio importam de
   `../src/domain/index.js`, nunca da interface.
 - Regras de empate/rodízio: testar o **estado interno** (field, queue, permanence, stats, composição
-  das equipes), não só textos. Use `mkSession(sizes, {gks, config, stars})` de `tests/helpers.js` para
+  das equipes), não só textos. Valores em dinheiro: sempre centavos inteiros (`formatMoney`/`parseMoney`). Use `mkSession(sizes, {gks, config, stars})` de `tests/helpers.js` para
   montar cenários determinísticos sem passar pelo otimizador.
 - Sorteio: use semente fixa e critérios de qualidade (amplitude, formação, mediana), não composições exatas.
 - Para rodar: abrir `tests/index.html` no servidor local; o resultado fica em `window.__results`.

@@ -9,7 +9,7 @@ export const PIN_RULES = { minLength: 4, maxLength: 8, sessionHours: 12 };
  * exportar backup. Nenhuma alteração; todo o resto exige o PIN mestre.
  */
 export const PUBLIC_ACTIONS = {
-  view: 'ver todas as abas, times, sorteios, resultados e histórico',
+  view: 'ver todas as abas, times, sorteios, resultados, histórico, rankings, extrato e Pix',
   share: 'compartilhar no WhatsApp',
   export: 'exportar backup',
 };
@@ -26,6 +26,7 @@ export const ADMIN_ACTIONS = {
   settings: 'alterar os ajustes do grupo',
   'history-delete': 'excluir pelada do histórico',
   'pin-change': 'alterar o PIN mestre',
+  finance: 'registrar pagamentos do dia e aportes, configurar o Pix e zerar os lançamentos de teste',
 };
 
 export function requiresAdmin(action) {

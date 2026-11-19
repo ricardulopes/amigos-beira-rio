@@ -3,8 +3,9 @@ import { app, activeSession } from './state.js';
 import { esc, fmt, stars, roleBadge, positionsBadges, starPicker, posBadge, vestIcon } from './dom.js';
 import {
   ROLE_NAMES, REMOVAL_REASONS, filterPlayers, allTeamsInOrder, queueLabel, simulateTransfer, teamStats, linePositions, PIN_RULES, ADMIN_ACTIONS, rosterPlanSummary,
-  vestOf, vestPreview,
+  vestOf, vestPreview, financeSettings, resetPreview, formatMoney,
 } from '../domain/index.js';
+import { pixBlock } from './views.js';
 
 function shell(title, body, footer = '', cls = '') {
   return `<div class="modal-back" data-act="modal-close-bg">
@@ -50,6 +51,14 @@ export function renderModal() {
       return playerInfoModal(m);
     case 'roster':
       return rosterModal(m);
+    case 'pix':
+      return shell('Pix da tesouraria', pixBlock(financeSettings(app.db.settings)), '<button class="btn primary" data-act="modal-close">Fechar</button>');
+    case 'pixEdit':
+      return pixEditModal(m);
+    case 'contrib':
+      return contribModal(m);
+    case 'reset':
+      return resetModal(m);
     case 'info':
       if (m.after) return shell(m.title, `<p>${esc(m.text)}</p><ul class="warn-list">${m.list.map((x) => `<li>${esc(x)}</li>`).join('')}</ul><p class="muted small">${esc(m.after)}</p>`, '<button class="btn primary" data-act="modal-close">Entendi</button>');
       return shell(m.title, `${m.list ? `<ul class="warn-list">${m.list.map((x) => `<li>${esc(x)}</li>`).join('')}</ul>` : ''}${m.text ? `<p>${esc(m.text)}</p>` : ''}`, '<button class="btn primary" data-act="modal-close">Entendi</button>');
@@ -113,6 +122,61 @@ function playerInfoModal(m) {
     <p class="muted small">Cadastro, estrelas e posições só são alterados por administradores (PIN mestre).</p>`;
   return shell('Ficha do jogador', body,
     `<button class="btn" data-act="player-admin-edit" data-id="${esc(p.id)}">🔒 Editar (admin)</button><button class="btn primary" data-act="modal-close">Fechar</button>`);
+}
+
+// --------------------------------------------------------------- financeiro (RN-118 a RN-127)
+
+function pixEditModal(m) {
+  const body = `
+    ${m.error ? `<div class="alert error">${esc(m.error)}</div>` : ''}
+    <label class="field"><span>Chave Pix da tesouraria</span><input id="m-pixkey" data-input="m:pixKey" value="${esc(m.pixKey || '')}" maxlength="77" autocomplete="off" placeholder="CPF, CNPJ, e-mail, celular ou chave aleatória"></label>
+    <label class="field"><span>Nome do recebedor (opcional)</span><input id="m-pixname" data-input="m:pixName" value="${esc(m.pixName || '')}" maxlength="60" autocomplete="off"></label>
+    <label class="field"><span>Pix Copia e Cola (opcional)</span><textarea id="m-pixcc" rows="3" data-input="m:pixCopyPaste" spellcheck="false" autocapitalize="off" placeholder="000201…">${esc(m.pixCopyPaste || '')}</textarea></label>
+    <div class="field"><span>QR Code (imagem)</span>
+      ${m.qrImage ? `<img class="pix-qr" src="${esc(m.qrImage)}" alt="Prévia do QR Code">` : '<p class="muted small">Nenhuma imagem. Use um print do QR Code gerado pelo app do banco.</p>'}
+      <div class="row-btns">
+        <label class="btn small file-btn">🖼 Escolher imagem<input type="file" accept="image/png,image/jpeg,image/webp" data-change="pix-qr"></label>
+        ${m.qrImage ? '<button class="btn small danger-ghost" data-act="pix-qr-clear">Remover imagem</button>' : ''}
+      </div>
+    </div>
+    <p class="muted small">Fica visível para todos os atletas na aba Caixa → Pix e no atalho 💠 da tela inicial.</p>`;
+  return shell('Configurar Pix', body, '<button class="btn" data-act="modal-close">Cancelar</button><button class="btn primary" data-act="pix-save">Salvar</button>', 'tall');
+}
+
+function contribModal(m) {
+  const q = (m.query || '').trim().toLowerCase();
+  const players = app.db.players
+    .filter((p) => !q || p.name.toLowerCase().includes(q))
+    .sort((a, b) => (a.type === b.type ? a.name.localeCompare(b.name, 'pt-BR') : a.type === 'gk' ? -1 : 1));
+  const sel = app.db.players.find((p) => p.id === m.pid);
+  const body = `
+    ${m.error ? `<div class="alert error">${esc(m.error)}</div>` : ''}
+    <div class="field"><span>Atleta${sel ? `: <b>${esc(sel.name)}</b>` : ''}</span>
+      <input id="m-cq" class="search" type="search" placeholder="Buscar atleta" data-input="m:query" value="${esc(m.query || '')}" autocomplete="off">
+      <div class="chips wrap pick-box">${players.map((p) => `<button class="chip ${m.pid === p.id ? 'on' : ''}" data-act="m-set" data-k="pid" data-v="${esc(p.id)}">${p.type === 'gk' ? '🧤 ' : ''}${esc(p.name)}</button>`).join('') || '<span class="muted small">Nenhum atleta.</span>'}</div>
+    </div>
+    <label class="field"><span>Valor (R$)</span><input id="m-amount" data-input="m:amount" value="${esc(m.amount || '')}" inputmode="decimal" placeholder="30,00" autocomplete="off"></label>
+    <label class="field"><span>Observação (opcional)</span><input id="m-note" data-input="m:note" value="${esc(m.note || '')}" maxlength="80" placeholder="Aporte livre"></label>
+    <p class="muted small">Soma ao cashback do ano do atleta e abate a festa de fim de ano.</p>`;
+  return shell('Aporte livre de cashback', body, `<button class="btn" data-act="modal-close">Cancelar</button><button class="btn primary" data-act="contrib-save" ${m.pid ? '' : 'disabled'}>Lançar aporte</button>`, 'tall');
+}
+
+function resetModal(m) {
+  const f = financeSettings(app.db.settings);
+  const pv = resetPreview(app.db.sessions, f);
+  const total = f.contributions.reduce((t, c) => t + c.cents, 0);
+  const body = `
+    ${m.error ? `<div class="alert error">${esc(m.error)}</div>` : ''}
+    ${pv.live ? '<div class="alert warn">Há uma pelada em andamento: encerre-a antes de zerar.</div>' : ''}
+    <p>Apaga <b>de todos os aparelhos e da nuvem</b>:</p>
+    <ul class="warn-list">
+      <li>${pv.peladas} pelada(s) com histórico, presenças e pagamentos (${pv.started} iniciada(s));</li>
+      <li>${pv.contributions} aporte(s) de cashback (${formatMoney(total)}).</li>
+    </ul>
+    <p class="small">Continuam: cadastro de atletas (${app.db.players.length}), configuração do Pix e ajustes. Depois disso o app sai do modo teste e começa o <b>ciclo oficial</b> do zero.</p>
+    <p class="small">Não dá para desfazer. Se quiser guardar uma cópia, exporte o backup antes: <button class="btn small" data-act="export">⬇ Exportar backup</button></p>
+    <label class="field"><span>Digite <b>ZERAR</b> para confirmar</span><input id="m-confirm" data-input="m:confirm" value="${esc(m.confirm || '')}" autocomplete="off" autocapitalize="characters"></label>`;
+  return shell('Zerar lançamentos de teste', body, '<button class="btn" data-act="modal-close">Cancelar</button><button class="btn danger" data-act="reset-ok">Zerar tudo</button>', 'tall');
 }
 
 // --------------------------------------------------------------- importação em lote
@@ -284,6 +348,7 @@ function moreModal(s) {
     <p class="muted small">Use apenas para corrigir um registro. O motor normalmente define isso sozinho.</p></div>
     <button class="btn wide" data-act="open-swap">⇄ Trocar jogadores</button>
     <button class="btn wide" data-act="open-gk">🧤 Goleiros</button>
+    <button class="btn wide" data-act="go-caixa">💰 Pagamentos do dia</button>
     <button class="btn wide" data-act="go-history">📚 Histórico desta pelada</button>
     <div class="card small"><b>Equipes</b>${allTeamsInOrder(s).map((t) => { const st = teamStats(s, t); return `<div class="small">${esc(t.label)} · ${queueLabel(s, t.id)} · ${st.size} linha · ${fmt(st.sum)}★ · V${t.stats.wins} E${t.stats.draws} D${t.stats.losses}${t.stats.drawPermanences ? ` · ${t.stats.drawPermanences} perm. por empate` : ''}</div>`; }).join('')}</div>`;
   return shell('Mais opções', body, '<button class="btn primary" data-act="modal-close">Fechar</button>');

@@ -21,14 +21,22 @@ técnicos, no [CLAUDE.md](CLAUDE.md).
       atrasados, retiradas, ajustes, avisos, estatísticas, compartilhamento) com API única em `index.js`.
 - [x] Teste de isolamento: o domínio não usa DOM/navegador/armazenamento e a interface só o acessa por `index.js`.
 - [x] Servidor local em PowerShell (`tools/serve.ps1`) e geração de ícones (`tools/make-icons.ps1`).
-- [x] Documentação: README.md, PRD.md (112 regras), CLAUDE.md, TASKS.md.
-- [x] 127 testes automatizados passando (navegador e Node).
+- [x] Documentação: README.md, PRD.md (127 regras), CLAUDE.md, TASKS.md.
+- [x] 141 testes automatizados passando (navegador e Node).
 - [x] Banco unificado no Supabase com PIN mestre, fila offline e Realtime (RN-113 a RN-117).
 - [x] Visitante só lê; toda alteração exige o PIN mestre; código do jogador removido (RN-116, 2026-11-19).
 - [x] Rodar `supabase/schema.sql` no Supabase e definir o PIN mestre (dono).
 - [x] Conferido no Supabase real: login, gravação de ajustes, Realtime, recusa sem PIN.
-- [ ] Rodar de novo o `supabase/schema.sql` para remover o código do jogador do banco (dono).
-- [ ] Teste ponta a ponta com dois celulares: pelada inteira (sorteio/resultados), sem sinal, conflito.
+- [x] Rodar de novo o `supabase/schema.sql` para remover o código do jogador do banco (dono).
+- [x] Pelada inteira gravada no Supabase real (sorteio, resultados, histórico) — 2026-11-19.
+- [ ] Teste com dois celulares: sem sinal e conflito entre dois admins.
+
+### Financeiro em modo teste (RN-118 a RN-127)
+- [x] Presença por pelada iniciada, cashback de linha (R$ 3), goleiro isento com aportes livres, festa de R$ 300.
+- [x] Caixa do dia (Pix, Cartão, Isento), aportes, extrato livre, Pix/QR Code configurável, rankings Top 32/Top 4.
+- [x] Zerar lançamentos de teste (Ajustes → Financeiro e Pix) para iniciar o ciclo oficial.
+- [ ] Usar nas próximas peladas e revisar com o dono: crédito do R$ 3 só com pagamento? desempate na linha de corte?
+- [ ] 🔶 Importar o saldo da planilha (15/11/2026) — adiado pelo dono; conciliação de nomes já levantada.
 
 ### Cadastro (RN-01 a RN-07)
 - [x] Cadastro com nome, estrelas (1 a 3, de 0,5 em 0,5), tipo (linha/goleiro) e posições (D, M, A).

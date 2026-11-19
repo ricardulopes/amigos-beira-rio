@@ -20,6 +20,7 @@
 //   share       texto para WhatsApp
 //   admin       permissões: visitante só lê × PIN mestre para qualquer alteração, formato do PIN
 //   roster      importação da base de atletas em lote (lista em texto)
+//   finance     presenças, pagamentos do dia, cashback, aportes, rankings semestrais, Pix e reset de testes
 
 export * from './constants.js';
 export { isValidStars, sumStars, mean, median, range, formatStars, starsText } from './stars.js';
@@ -45,3 +46,8 @@ export {
   PIN_RULES, PUBLIC_ACTIONS, ADMIN_ACTIONS, requiresAdmin, validatePinFormat, adminExpiry, isAdminActive,
 } from './admin.js';
 export { parseRosterLine, parseRoster, planRosterImport, applyRosterImport, rosterPlanSummary, rosterText, seedPlayers } from './roster.js';
+export {
+  FINANCE_RULES, PAYMENT_METHODS, QR_MAX_CHARS, formatMoney, parseMoney, financeSettings, setPixConfig, setPixQr,
+  semesterOf, semesterLabel, countedPeladas, paymentOf, attendanceRecords, semestersAvailable, semesterRanking,
+  yearCashback, statement, groupCashback, paymentSummary, setPayment, addContribution, removeContribution, resetPreview, resetCycle,
+} from './finance.js';

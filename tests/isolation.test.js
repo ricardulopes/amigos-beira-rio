@@ -43,9 +43,11 @@ const READ_ONLY_ACTIONS = new Set([
   'share', 'share-copy', 'share-wa', 'share-native', 'export', 'share-backup', 'open-log', 'open-more',
   'admin-toggle', 'pin-ok', 'player-edit', 'player-admin-edit', 'cloud-sync', 'wipe', 'confirm-ok',
   'm-set', 'm-qty', 'm-pos', 'm-type', 'pick', 'roster-official', 'roster-current', 'roster-preview',
+  // caixa: trocar aba/semestre, ver extrato, ver e copiar o Pix, abrir a aba de pagamentos (só leitura)
+  'ftab', 'fsem', 'frank', 'fpay-pick', 'stmt-pick', 'stmt-clear', 'pix-open', 'pix-copy', 'go-caixa',
 ]);
 // Campos livres: busca, campos de janelas (abertas só pelo admin) e opções do texto do WhatsApp.
-const FREE_FIELD = /^(psearch|ssearch|share-opt|roster-file|m:.*)$/;
+const FREE_FIELD = /^(psearch|ssearch|fsearch|share-opt|roster-file|m:.*)$/;
 
 suite('Visitante só lê (RN-116)', () => {
   test('Nenhuma ação livre altera dados: a lista FREE_ACTIONS do app só tem leitura/navegação', async () => {

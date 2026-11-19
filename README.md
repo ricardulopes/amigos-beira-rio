@@ -77,6 +77,23 @@ O app mostra o colete (dupla-face) de cada equipe em campo:
   é avisado.
 - **Trocar o PIN mestre:** Ajustes → Alterar PIN mestre (admin), ou no SQL Editor com `set_master_pin`.
 
+## Caixa: presenças, pagamentos, cashback e rankings (modo teste)
+
+Aba **Caixa** (💲 na barra de baixo). Está em **modo teste**: tudo já funciona e grava na nuvem, mas
+será zerado antes do ciclo oficial.
+- **Presença:** quem está na pelada ganha uma presença quando ela é **iniciada** (sorteio não iniciado não conta).
+- **Linha:** R$ 18 por pelada (R$ 15 operacional + R$ 3 de cashback). Cada presença soma **R$ 3** ao cashback do ano.
+- **Goleiros:** isentos da taxa; o cashback deles vem de **aportes livres** (ex.: R$ 30, R$ 50) lançados pelo admin.
+- **Festa de dezembro (R$ 300):** o cashback do ano abate a taxa; paga-se só a diferença. Zera na virada do ano.
+- **Ranking de Linha** (Top 32 com vaga prioritária) e **Goleiros** (Top 4), por semestre (jan–jun, jul–dez),
+  com % sobre os jogos realizados. Reinicia a cada semestre.
+- **Extrato (qualquer pessoa):** escolha seu nome e veja jogos, %, cashback, quanto falta para a festa e pendências.
+- **Pix:** chave, "Copia e Cola" e QR Code da tesouraria, com botão de copiar (também no atalho 💠 da tela inicial).
+- **Admin (PIN mestre):** **Caixa do dia** (marcar Pix, Cartão ou Isento de cada atleta; atalho
+  "💰 Pagamentos" no sorteio e em "⋯ Mais" na partida), **Aportes** e, em **Ajustes → Financeiro e Pix**,
+  configurar o Pix/QR Code e **🧹 Zerar lançamentos de teste** (apaga peladas, presenças, pagamentos e aportes;
+  mantém cadastro e Pix; pede para digitar ZERAR). Depois de zerar, começa o ciclo oficial.
+
 ## Importar lista de atletas
 
 **Jogadores → ⬆ Importar lista de atletas**: cole ou abra um `.txt` com um atleta por linha,
@@ -107,6 +124,7 @@ src/domain/       Regras de negócio puras — sem interface, sem navegador, tes
   share.js        Texto para WhatsApp          constants.js / rng.js
   admin.js        Permissões: visitante só lê × PIN mestre para alterar
   roster.js       Importação da base em lote
+  finance.js      Presenças, pagamentos, cashback, aportes, rankings, Pix e reset de testes
 src/storage/      Cópia local versionada, pilha de desfazer (40 passos), exportar/importar
 src/cloud/        Supabase: carga, Realtime, fila offline, login de admin (sync.js); parte pura (diff.js)
 supabase/         schema.sql: tabelas, RLS, funções protegidas, Realtime e lista oficial

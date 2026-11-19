@@ -1,7 +1,7 @@
 // Controlador da interface: roteamento, renderização e ações.
 // Toda regra de negócio é delegada ao domínio (src/domain, via index.js). Aqui só orquestramos.
 import { app, store, save, activeSession, replaceSession, setupState, openModal, closeModal, toast, navigate, adminActive } from './state.js';
-import { homeView, playersView, setupView, draftView, liveView, historyView, historyDetailView, settingsView, tabbar, defaultTitle } from './views.js';
+import { homeView, playersView, setupView, draftView, liveView, historyView, historyDetailView, settingsView, financeView, tabbar, defaultTitle } from './views.js';
 import { renderModal } from './modals.js';
 import { esc } from './dom.js';
 import {
@@ -9,7 +9,7 @@ import {
   createSession, redraw, startSession, finishSession, analyzeResult, registerResult, addLatePlayer, removePlayer,
   transferPlayers, movePlayerInOrder, swapPlayers, moveGoalkeeper, setPermanence, RuleError,
   shareText, validatePinFormat, parseRoster, planRosterImport, applyRosterImport, rosterPlanSummary,
-  rosterText,
+  rosterText, financeSettings, setPayment, addContribution, removeContribution, setPixConfig, setPixQr, resetCycle, QR_MAX_CHARS, formatMoney,
 } from '../domain/index.js';
 import { OFFICIAL_ROSTER } from '../data/lista-oficial.js';
 import { initCloud, login, logout, changePin, pullAll, flush, cloud } from '../cloud/sync.js';
@@ -57,6 +57,7 @@ function view() {
   if (r === '/historico') return historyView();
   if (r.startsWith('/historico/')) return historyDetailView(r.split('/')[2]);
   if (r === '/ajustes') return settingsView();
+  if (r === '/caixa') return financeView();
   return homeView();
 }
 
@@ -73,13 +74,16 @@ function onRoute() {
 
 // ------------------------------------------------------------------ execução transacional de comandos
 
-/** Executa um comando de domínio na pelada ativa com desfazer e persistência. */
-function exec(labelText, fn, { silent = false } = {}) {
-  const s = activeSession();
+/**
+ * Executa um comando de domínio na pelada ativa (ou na pelada `sid`) com desfazer e persistência.
+ * `undo: false` para registros que não são movimentação de jogo (pagamento do dia).
+ */
+function exec(labelText, fn, { silent = false, sid = null, undo = true } = {}) {
+  const s = sid ? app.db.sessions.find((x) => x.id === sid) : activeSession();
   if (!s) return null;
   try {
     const res = fn(s);
-    store.pushUndo(s.id, labelText, s);
+    if (undo) store.pushUndo(s.id, labelText, s);
     replaceSession(res.state);
     save();
     if (res.warnings?.length) {
@@ -134,10 +138,73 @@ const FREE_ACTIONS = new Set([
   'share', 'share-copy', 'share-wa', 'share-native', 'export', 'share-backup', 'open-log', 'open-more',
   'admin-toggle', 'pin-ok', 'player-edit', 'player-admin-edit', 'cloud-sync', 'wipe', 'confirm-ok',
   'm-set', 'm-qty', 'm-pos', 'm-type', 'pick', 'roster-official', 'roster-current', 'roster-preview',
+  'ftab', 'fsem', 'frank', 'fpay-pick', 'stmt-pick', 'stmt-clear', 'pix-open', 'pix-copy', 'go-caixa',
 ]);
 
 /** Ajustes e seleção de presentes (campos de formulário) também são do administrador. */
-const ADMIN_FIELDS = new Set(['stitle', 'ssched', 'setup-gk', 'setup-reqgk', 'set-group', 'set-tol', 'set-n', 'set-gk', 'set-reqgk', 'set-toss', 'import']);
+const ADMIN_FIELDS = new Set(['stitle', 'ssched', 'setup-gk', 'setup-reqgk', 'set-group', 'set-tol', 'set-n', 'set-gk', 'set-reqgk', 'set-toss', 'import', 'pix-qr']);
+
+// ------------------------------------------------------------------ financeiro (RN-118 a RN-127)
+
+const MY_ATHLETE = 'pelada.meuAtleta'; // escolha do extrato, só neste aparelho
+try {
+  app.ui.stmtPid = localStorage.getItem(MY_ATHLETE) || null;
+} catch {
+  app.ui.stmtPid = null;
+}
+
+function rememberAthlete(pid) {
+  try {
+    if (pid) localStorage.setItem(MY_ATHLETE, pid);
+    else localStorage.removeItem(MY_ATHLETE);
+  } catch {
+    /* sem armazenamento: vale só nesta abertura */
+  }
+}
+
+/** Aplica uma mudança do domínio em settings.finance e grava (aportes, Pix). */
+function updateFinance(fn, okMsg) {
+  try {
+    const res = fn(financeSettings(app.db.settings));
+    app.db.settings.finance = res.finance || res;
+    if (save()) {
+      toast(res.message || okMsg, 'ok');
+      return true;
+    }
+  } catch (e) {
+    toast(e instanceof RuleError ? e.message : `Operação cancelada: ${e.message}`, 'error', 5000);
+  }
+  return false;
+}
+
+/** Reduz a imagem do QR Code para caber nos ajustes da nuvem (máx. 480 px). */
+async function readQrImage(file) {
+  if (!/^image\/(png|jpeg|webp)$/.test(file.type)) throw new RuleError('Use uma imagem PNG, JPG ou WEBP.');
+  if (file.size > 8 * 1024 * 1024) throw new RuleError('Imagem muito grande (máximo 8 MB).');
+  const url = URL.createObjectURL(file);
+  try {
+    const img = await new Promise((ok, fail) => {
+      const i = new Image();
+      i.onload = () => ok(i);
+      i.onerror = () => fail(new RuleError('Não foi possível abrir a imagem.'));
+      i.src = url;
+    });
+    const scale = Math.min(1, 480 / Math.max(img.naturalWidth, img.naturalHeight));
+    const c = document.createElement('canvas');
+    c.width = Math.round(img.naturalWidth * scale);
+    c.height = Math.round(img.naturalHeight * scale);
+    const ctx = c.getContext('2d');
+    ctx.fillStyle = '#fff';
+    ctx.fillRect(0, 0, c.width, c.height);
+    ctx.imageSmoothingEnabled = false; // QR Code nítido
+    ctx.drawImage(img, 0, 0, c.width, c.height);
+    let data = c.toDataURL('image/png');
+    if (data.length > QR_MAX_CHARS * 0.75) data = c.toDataURL('image/jpeg', 0.85);
+    return data;
+  } finally {
+    URL.revokeObjectURL(url);
+  }
+}
 
 function blockField() {
   render(); // devolve o valor que estava
@@ -451,7 +518,8 @@ const actions = {
     const s = activeSession();
     const item = store.popUndo(s.id);
     if (!item) return toast('Nada para desfazer.');
-    replaceSession(item.state);
+    // Pagamentos do dia não são movimentação de jogo: desfazer um resultado não apaga pagamento.
+    replaceSession(s.payments ? { ...item.state, payments: s.payments } : item.state);
     save();
     app.ui.lastExplanation = null;
     toast(`Desfeito: ${item.label}.`, 'ok');
@@ -550,21 +618,144 @@ const actions = {
         location.reload();
       },
     }),
+
+  // ---------- caixa: ranking, extrato, Pix (livres) e pagamentos, aportes, reset (admin)
+  ftab: (d) => {
+    app.ui.financeTab = d.tab;
+    if (app.ui.route !== '/caixa') navigate('/caixa');
+    else render();
+  },
+  fsem: (d) => {
+    app.ui.rankSem = d.v;
+    render();
+  },
+  frank: (d) => {
+    app.ui.rankType = d.v;
+    render();
+  },
+  'stmt-pick': (d) => {
+    app.ui.stmtPid = d.id;
+    app.ui.financeTab = 'extrato';
+    app.ui.financeQuery = '';
+    rememberAthlete(d.id);
+    window.scrollTo(0, 0);
+    if (app.ui.route !== '/caixa') navigate('/caixa');
+    else render();
+  },
+  'stmt-clear': () => {
+    app.ui.stmtPid = null;
+    rememberAthlete(null);
+    render();
+  },
+  'pix-open': () => openModal('pix', {}),
+  'pix-copy': (d) => {
+    const f = financeSettings(app.db.settings);
+    copy(d.k === 'cc' ? f.pixCopyPaste : f.pixKey, d.k === 'cc' ? 'Pix Copia e Cola copiado.' : 'Chave Pix copiada.');
+  },
+  'go-caixa': () => {
+    app.ui.financeTab = 'caixa';
+    app.ui.paySid = activeSession()?.id || null;
+    app.ui.modal = null;
+    navigate('/caixa');
+  },
+  'fpay-pick': (d) => {
+    app.ui.paySid = d.id;
+    render();
+  },
+  'pay-set': (d) => exec('Pagamento', (s) => setPayment(s, d.pid, d.m || null), { sid: d.sid, undo: false, silent: true }),
+  'contrib-new': (d) => openModal('contrib', { pid: d.pid || null, query: '', amount: '', note: '' }),
+  'contrib-save': () => {
+    const m = app.ui.modal;
+    const p = app.db.players.find((x) => x.id === m.pid);
+    try {
+      const res = addContribution(financeSettings(app.db.settings), { pid: m.pid, name: p?.name || '', amount: m.amount, note: m.note });
+      app.db.settings.finance = res.finance;
+      if (save()) {
+        app.ui.modal = null;
+        toast(res.message, 'ok');
+      }
+    } catch (e) {
+      m.error = e.message;
+      render();
+    }
+  },
+  'contrib-del': (d) => {
+    const c = financeSettings(app.db.settings).contributions.find((x) => x.id === d.id);
+    if (!c) return;
+    openModal('confirm', {
+      title: 'Excluir aporte',
+      text: `Excluir o aporte de ${c.name} (${formatMoney(c.cents)})? O cashback do atleta diminui na hora.`,
+      okText: 'Excluir',
+      danger: true,
+      onOk: () => {
+        app.ui.modal = null;
+        updateFinance((f) => removeContribution(f, d.id), 'Aporte excluído.');
+      },
+    });
+  },
+  'pix-edit': () => {
+    const f = financeSettings(app.db.settings);
+    openModal('pixEdit', { pixKey: f.pixKey, pixName: f.pixName, pixCopyPaste: f.pixCopyPaste, qrImage: f.qrImage });
+  },
+  'pix-qr-clear': () => {
+    app.ui.modal.qrImage = '';
+    render();
+  },
+  'pix-save': () => {
+    const m = app.ui.modal;
+    try {
+      const f = setPixQr(setPixConfig(financeSettings(app.db.settings), m), m.qrImage);
+      app.db.settings.finance = f;
+      if (save()) {
+        app.ui.modal = null;
+        toast('Pix da tesouraria salvo para todos os aparelhos.', 'ok');
+      }
+    } catch (e) {
+      m.error = e.message;
+      render();
+    }
+  },
+  'reset-open': () => openModal('reset', { confirm: '' }),
+  'reset-ok': () => {
+    const m = app.ui.modal;
+    if (String(m.confirm || '').trim().toUpperCase() !== 'ZERAR') {
+      m.error = 'Digite ZERAR para confirmar.';
+      return render();
+    }
+    try {
+      const r = resetCycle({ sessions: app.db.sessions, finance: financeSettings(app.db.settings) });
+      for (const s of app.db.sessions) store.clearUndo(s.id);
+      app.db.sessions = r.sessions;
+      app.db.activeSessionId = null;
+      app.db.setup = null;
+      app.db.settings.finance = r.finance;
+      if (save()) {
+        app.ui.modal = null;
+        app.ui.paySid = null;
+        toast(`Lançamentos zerados: ${r.removed.peladas} pelada(s) e ${r.removed.contributions} aporte(s). Ciclo oficial iniciado.`, 'ok', 7000);
+        navigate('/caixa');
+      }
+    } catch (e) {
+      m.error = e.message;
+      render();
+    }
+  },
 };
 
-async function copy(text) {
+async function copy(text, okText = 'Texto copiado.') {
   try {
     await navigator.clipboard.writeText(text);
-    toast('Texto copiado.', 'ok');
+    toast(okText, 'ok');
   } catch {
-    const ta = document.querySelector('.share-text');
-    if (ta) {
-      ta.removeAttribute('readonly');
-      ta.select();
-      document.execCommand('copy');
-      ta.setAttribute('readonly', '');
-      toast('Texto copiado.', 'ok');
-    } else toast('Não foi possível copiar.', 'error');
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    ta.setAttribute('readonly', '');
+    ta.style.cssText = 'position:fixed;opacity:0;top:0;left:0';
+    document.body.appendChild(ta);
+    ta.select();
+    const ok = document.execCommand('copy');
+    ta.remove();
+    toast(ok ? okText : 'Não foi possível copiar.', ok ? 'ok' : 'error');
   }
 }
 
@@ -634,6 +825,9 @@ document.addEventListener('input', (ev) => {
   } else if (key === 'ssearch') {
     app.ui.setupQuery = el.value;
     render();
+  } else if (key === 'fsearch') {
+    app.ui.financeQuery = el.value;
+    render();
   } else if (key === 'stitle') {
     setupState().title = el.value;
     save();
@@ -699,6 +893,19 @@ document.addEventListener('change', async (ev) => {
       m.opts[el.dataset.k] = el.checked;
       m.text = shareText(activeSession(), m.opts);
       break;
+    }
+    case 'pix-qr': {
+      const file = el.files[0];
+      el.value = '';
+      if (!file || app.ui.modal?.type !== 'pixEdit') return;
+      try {
+        app.ui.modal.qrImage = await readQrImage(file);
+        app.ui.modal.error = '';
+      } catch (e) {
+        app.ui.modal.error = e.message;
+      }
+      render();
+      return;
     }
     case 'roster-file': {
       const file = el.files[0];

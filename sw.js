@@ -1,10 +1,10 @@
 // Service worker: funciona offline (campo de futebol sem sinal).
 // Estratégia: rede primeiro para o app (pega atualizações), cache como reserva.
-const CACHE = 'pelada-v9';
+const CACHE = 'pelada-v10';
 const DOMAIN = [
   'index', 'constants', 'stars', 'players', 'tactics', 'rng', 'draw', 'setup', 'session',
   'tieRules', 'rotation', 'arrivals', 'removals', 'adjustments', 'balance', 'stats', 'share',
-  'admin', 'roster', 'vests',
+  'admin', 'roster', 'vests', 'finance',
 ];
 const ASSETS = [
   './', './index.html', './manifest.webmanifest', './css/app.css',

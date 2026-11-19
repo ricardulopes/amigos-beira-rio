@@ -558,6 +558,48 @@ login ou senha, e toda alteração passa a exigir o PIN mestre (RN-116 reescrita
 chamar as funções protegidas. A chave secreta nunca vai para o app (verificado em teste). Como não há
 etapa de build, não há variáveis de ambiente no Vercel.
 
+### 16.3 Financeiro, presenças, cashback e rankings (`src/domain/finance.js`)
+
+Pedido do dono em 2026-11-19: digitalizar o controle de presenças, pagamentos e cashback, começando em
+**modo teste** (sem importar a planilha antiga), com uma ferramenta para zerar tudo antes do ciclo oficial.
+Não exigiu mudança no banco: presença e pagamento ficam dentro de cada pelada (`peladas.state`) e aportes,
+Pix e modo teste ficam nos ajustes do grupo (`app_state.settings.finance`), gravados pelas funções `admin_*` já existentes.
+
+- **RN-118 — Presença.** Cada atleta que está na pelada (no `snapshot`: selecionados, atrasados, retirados
+  por lesão e goleiros reserva) tem **uma presença** quando a pelada é **iniciada** (ao vivo ou encerrada).
+  Sorteio não iniciado (rascunho) não conta. O tipo da presença (linha ou goleiro) é o daquela pelada: o mesmo
+  atleta pode ter histórico como linha e como goleiro. "Jogos realizados" = peladas iniciadas no período.
+- **RN-119 — Taxa e pagamento do dia.** Linha paga **R$ 18** por pelada (R$ 15 operacional + R$ 3 retidos para o
+  cashback). Goleiro é **isento** (não aceita Pix/Cartão; aparece como "Isento (goleiro)"). O admin marca,
+  por pelada, **Pix**, **Cartão** (maquininha) ou **Isento**; sem marcação = pendente. Tocar de novo na forma
+  marcada volta a pendente. O pagamento não é movimentação de jogo: não vai para o desfazer e desfazer um
+  resultado não apaga pagamentos.
+- **RN-120 — Cashback.** Cada presença como linha soma **R$ 3** ao cashback do ano do atleta. Goleiros (e quem
+  quiser) acumulam por **aportes livres** lançados pelo admin (ex.: R$ 30, R$ 50). *Decisão:* o crédito de R$ 3
+  vem da presença confirmada (pelada iniciada), mesmo com o pagamento pendente; a pendência aparece no extrato e
+  no caixa do dia para cobrança. Se o dono quiser creditar só depois do pagamento, muda-se aqui.
+- **RN-121 — Semestres.** 1º semestre = janeiro a junho; 2º = julho a dezembro (data de início da pelada).
+  O ranking de presença **reinicia a cada semestre**; o cashback acumula o **ano inteiro**.
+- **RN-122 — Rankings.** "Ranking de Linha" e "Goleiros", por semestre: presenças, % = presenças ÷ jogos
+  realizados no semestre. Ordem: mais presenças; empate por nome (só para exibir). **Top 32** (linha) e
+  **Top 4** (goleiros) ficam destacados com a linha de corte da vaga prioritária no campeonato; empate exatamente
+  na linha de corte é avisado (a decisão do desempate é dos organizadores).
+- **RN-123 — Festa de fim de ano (R$ 300).** Todo atleta abate o cashback do ano da taxa da festa de dezembro e
+  paga só a diferença; com R$ 300 ou mais, a festa aparece como quitada. O cashback zera na virada do ano
+  (conta só o ano corrente).
+- **RN-124 — Extrato (livre para todos).** O atleta escolhe o próprio nome (lembrado no aparelho) e vê jogos do
+  semestre (linha e gol, com %), cashback do ano (presenças × R$ 3 + aportes), quanto falta para a festa,
+  pendências de pagamento e os lançamentos do ano.
+- **RN-125 — Pix da tesouraria.** O admin configura chave Pix, nome do recebedor, código "Copia e Cola"
+  (começa com `000201`) e a imagem do QR Code (reduzida no aparelho para até 480 px). Todos veem e copiam
+  em Caixa → Pix e no atalho 💠 da tela inicial.
+- **RN-126 — Permissões.** Ranking, extrato e Pix são livres (só leitura). Pagamentos do dia, aportes,
+  configuração do Pix e o reset exigem o PIN mestre (RN-114).
+- **RN-127 — Modo teste e reset.** O financeiro começa em **modo teste** (aviso na aba Caixa). Em Ajustes →
+  Financeiro e Pix, o admin pode **zerar os lançamentos**: apaga todas as peladas (histórico, presenças,
+  pagamentos) e os aportes, na nuvem e em todos os aparelhos; mantém cadastro, Pix e ajustes; exige digitar
+  ZERAR e que nenhuma pelada esteja em andamento. Depois disso o app entra no **ciclo oficial**.
+
 ---
 
 ## 17. Requisitos não funcionais
@@ -577,7 +619,7 @@ etapa de build, não há variáveis de ambiente no Vercel.
 
 ---
 
-## 18. Testes automatizados (cobertura atual: 127 testes)
+## 18. Testes automatizados (cobertura atual: 141 testes)
 
 Executar em `tests/index.html` (navegador) ou `node tests/run-node.mjs`.
 
@@ -590,12 +632,13 @@ Executar em `tests/index.html` (navegador) ou `node tests/run-node.mjs`.
 | `tests/cloud.test.js` | Visitante não grava (mudança sem admin é recusada e não entra na fila); banco unificado: diferenças entre versões, fila offline (sem duplicar, versão-base da primeira mudança, exclusões), pelada nova, mescla com a nuvem com e sem pendências, conversão de linhas |
 | `tests/admin.test.js` | Formato do PIN mestre, visitante só vê/compartilha/exporta × PIN mestre para qualquer alteração, sem código do jogador, acesso de 12 h; lista oficial embutida; leitura da lista em lote (formatos, "Felipe 2", erros), mesclar, X, jogador novo incompleto, ida e volta, substituir |
 | `tests/vests.test.js` | Coletes Amarelo/Azul: abertura, vitória de cada cor, sequência de vitórias, empate com saída dupla, empate com um só saindo, indicador neutro da PRO, prévia e explicação, WhatsApp, integridade (cores diferentes), migração de peladas antigas |
+| `tests/finance.test.js` | Financeiro (RN-118 a RN-127): dinheiro em centavos, R$ 18 = 15 + 3, presença só em pelada iniciada e com o tipo do snapshot, semestres, rankings com Top 32/Top 4 e empate no corte, cashback anual com virada do ano, aportes, festa quitada, extrato, pagamento puro (goleiro isento), resumo do caixa, Pix/QR validados, reset |
 | `tests/isolation.test.js` | Visitante só lê: ações livres do app só de leitura/navegação, todo campo que altera dados exige PIN, nenhuma função do banco liberada sem ser de admin; o domínio não usa DOM/navegador/armazenamento, só importa a si mesmo, e interface/persistência/nuvem só o acessam por `src/domain/index.js`; nenhuma chave secreta do Supabase no app |
 
 **Não coberto por teste automatizado:** a execução do SQL e a conversa real com o Supabase. Conferido
 à mão em 2026-11-19: login com PIN mestre, gravação de ajustes, Realtime entre duas conexões e recusa de
-gravação sem PIN. Ainda não conferidos: gravação de pelada (sorteio/resultados), fila sem sinal,
-conflito entre dois admins e Android real.
+gravação sem PIN e uma pelada inteira (sorteio, resultados, encerramento, histórico). Ainda não
+conferidos: fila sem sinal, conflito entre dois admins e Android real.
 
 ---
 
