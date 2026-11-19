@@ -49,24 +49,25 @@ suite('Permissões: PIN mestre e visitante só leitura (RN-113 a RN-117)', () =>
 });
 
 suite('Lista oficial embutida (RN-112)', () => {
-  test('A lista oficial é lida sem erros: 78 atletas, 3 goleiros, valores conferidos', () => {
+  test('A lista oficial é lida sem erros: 79 atletas, 5 goleiros, valores conferidos (auditoria 2026-11-19)', () => {
     const players = seedPlayers(OFFICIAL_ROSTER);
-    assert.equal(players.length, 78);
-    assert.deepEqual(players.filter((p) => p.type === 'gk').map((p) => p.name).sort(), ['Fabio', 'Humberto', 'Jarbas']);
+    assert.equal(players.length, 79);
+    assert.deepEqual(players.filter((p) => p.type === 'gk').map((p) => p.name).sort((a, b) => a.localeCompare(b, 'pt-BR')), ['Fabio', 'Jarbas', 'João Marcos', 'Johnin', 'Paulão']);
     const by = Object.fromEntries(players.map((p) => [p.name, p]));
     assert.equal(by.Jarbas.stars, 2);
     assert.equal(by.Fabio.stars, 1.5);
-    assert.equal(by.Wagner.stars, 2);
+    assert.equal(by.Vagner.stars, 1.5);
     assert.deepEqual(by.Ricardo.positions, ['D', 'M', 'A']);
-    assert.ok(by.Udsnei && by.Van && by.Vagner && by.Kauan && by.Cantor);
-    assert.equal(new Set(players.map((p) => p.id)).size, 78, 'ids únicos');
+    assert.ok(by.Udsney && by.Van && by['Jonathan (Cabeção)'] && by['Kauã'] && by['Maurício Pai'] && by.Cantor);
+    assert.ok(!by.Wagner && !by.Humberto && !by['Cabeção'], 'unificados/excluídos não voltam');
+    assert.equal(new Set(players.map((p) => p.id)).size, 79, 'ids únicos');
     assert.throws(() => seedPlayers('Fulano; 9; M'), /Lista inicial com erro/);
   });
 
   test('Primeira abertura semeia o cadastro e salva; depois não semeia de novo', () => {
     const be = memBackend();
     const db1 = createStore(be).load();
-    assert.equal(db1.players.length, 78);
+    assert.equal(db1.players.length, 79);
     assert.ok(be.getItem('pelada.db'), 'gravado na primeira abertura');
     const db2 = createStore(be).load();
     assert.deepEqual(db2.players.map((p) => p.id), db1.players.map((p) => p.id), 'mesmos ids ao reabrir');

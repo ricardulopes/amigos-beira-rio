@@ -75,7 +75,7 @@ cadastro dos jogadores até o encerramento da sequência de jogos:
   mudança, ignorados e erros por linha) → **Aplicar** (confirmação extra quando houver exclusões). No
   modo mesclar, linhas com erro são ignoradas e as válidas são aplicadas. "Carregar cadastro atual"
   gera a lista no mesmo formato (ida e volta sem alterações). Exige o PIN mestre (RN-114).
-- **RN-112** Lista oficial do grupo **embutida no app** (`src/data/lista-oficial.js`, 78 atletas). Na
+- **RN-112** Lista oficial do grupo **embutida no app** (`src/data/lista-oficial.js`, 79 atletas). Na
   **primeira abertura** num aparelho (nada salvo ainda), o cadastro já começa com ela, sem importação
   manual, e é salvo na hora (ids fixos). Aparelho que já tem dados não é alterado. Depois de "Apagar
   todos os dados" o cadastro fica vazio (a lista não volta sozinha). O botão "Usar lista oficial do
@@ -83,6 +83,12 @@ cadastro dos jogadores até o encerramento da sequência de jogos:
   conferir e aplicar. Lista com qualquer linha inválida não é semeada (testado). Com o banco unificado
   (RN-113), a mesma lista também é carregada no Supabase pelo `supabase/schema.sql`; a cópia embutida
   serve de reserva enquanto o aparelho ainda não baixou os dados da nuvem.
+  *Auditoria de 2026-11-19 (decidida pelo dono):* Wagner unificado em Vagner (fica o cadastro do Vagner),
+  Humberto excluído, Cabeção → "Jonathan (Cabeção)", Mauricio → "Maurício Pai", grafias padronizadas
+  (Udsney, Jarlesson, Ryan, Isaías, Kauã, Waguinho, Thiago, JP; Fonti, Phablo e Kleuber mantidos), acentos
+  (Gardênio, Luizão, Maurício Filho, Fabrício, Júlio, Rogério, Vinícius, Jabá) e goleiros novos Johnin,
+  João Marcos e Paulão (1,5★). Pares confirmados como pessoas diferentes: Roger/Rogério, Felipe/Felipe II,
+  João/João Vitor, Van/Vandame/Ivan, Jabá/Japa, Luizão/Luizinho, Maurício Pai/Maurício Filho.
 
 ---
 

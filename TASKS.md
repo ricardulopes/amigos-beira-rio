@@ -47,7 +47,7 @@ técnicos, no [CLAUDE.md](CLAUDE.md).
 - [x] (substituído pelo PIN mestre, RN-113) Modo administrador por PIN no aparelho (RN-98 a RN-102): cadastro, estrelas, posições, exclusões e importações
       protegidos; rotina da pelada livre.
 - [x] Importação da base em lote (RN-103 a RN-107): colar/abrir lista, conferir, mesclar ou substituir, X exclui.
-- [x] Lista oficial do grupo embutida no app (`src/data/lista-oficial.js`, 78 atletas, sem os 21 marcados com X):
+- [x] Lista oficial do grupo embutida no app (`src/data/lista-oficial.js`, 79 atletas, sem os 21 marcados com X):
       já aparece na primeira abertura, sem importação manual (RN-112).
 
 ### Seleção e sorteio (RN-08 a RN-41)

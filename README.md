@@ -29,7 +29,7 @@ uma cópia para abrir sem sinal. **Ajustes → Exportar backup** continua dispon
 
 1. No painel do Supabase do projeto, abra **SQL Editor → New query**, cole o conteúdo de
    `supabase/schema.sql` e clique em **Run**. Isso cria as tabelas, as permissões (RLS), as funções
-   protegidas, liga o tempo real (Realtime) e carrega os 78 atletas da lista oficial.
+   protegidas, liga o tempo real (Realtime) e carrega os 79 atletas da lista oficial.
 2. Numa consulta separada, defina o **PIN mestre** (4 a 8 números) — não salve o PIN em arquivo:
    `select public.set_master_pin('SEU_PIN');`
 3. Pronto: abra o app. Em **Ajustes → Banco na nuvem** deve aparecer "Conectado".
@@ -101,7 +101,7 @@ será zerado antes do ciclo oficial.
 **Conferir lista** mostra o que será criado/atualizado/excluído e os erros por linha; **Aplicar**
 grava. "Mesclar" mantém o resto do cadastro; "Substituir" exclui quem não estiver na lista.
 **Lista do grupo já vem no app:** na primeira vez que o app é aberto num aparelho, o cadastro já começa
-com os 78 atletas da lista oficial, sem precisar importar, e logo depois passa a mostrar o cadastro da
+com os 79 atletas da lista oficial, sem precisar importar, e logo depois passa a mostrar o cadastro da
 nuvem. A lista também é carregada no Supabase pelo `supabase/schema.sql`.
 
 ## Arquitetura
