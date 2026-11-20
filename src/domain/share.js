@@ -28,13 +28,13 @@ export function shareText(s, { includeOrder = true, includeStars = true, include
       const exit = includeOrder && x.position === 1 ? ' ⬅ sai 1º' : '';
       lines.push(`${prefix}${p.name}${includeStars ? ` ${starsText(p.stars)}` : ''}${role}${exit}`);
     }
-    const needsGk = usesGkQueue(s) ? s.field.includes(t.id) : s.config.useGoalkeepers;
-    if (needsGk && !t.gks.length) lines.push('🧤 (sem goleiro)');
+    if (usesGkQueue(s) && !t.gks.length) lines.push('🧤 (aguardando goleiro)');
+    else if (!usesGkQueue(s) && s.config.useGoalkeepers && !t.gks.length) lines.push('🧤 (sem goleiro)');
   }
-  // RN-135: goleiros que aguardam a vez, em ordem.
+  // RN-135: goleiros que sobraram (todos os times já têm goleiro), em ordem.
   if (usesGkQueue(s) && s.gkQueue.length) {
     lines.push('');
-    lines.push(`🧤 *FILA DE GOLEIROS:* ${s.gkQueue.map((g, i) => `${i + 1}º ${s.snapshot[g].name}`).join(', ')}`);
+    lines.push(`🧤 *GOLEIROS AGUARDANDO TIME:* ${s.gkQueue.map((g, i) => `${i + 1}º ${s.snapshot[g].name}`).join(', ')}`);
   }
   if (includeOrder) {
     lines.push('');

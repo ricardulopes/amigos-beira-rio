@@ -117,35 +117,36 @@ cadastro dos jogadores até o encerramento da sequência de jogos:
 - **RN-17** Ordem inicial: Time 1 e Time 2 começam em campo; Time 3 é PRO, Time 4 é RE, e assim por diante.
   Os nomes "Time X" são identificadores temporários; equipes criadas depois recebem o próximo número.
 
-### 4.1 Goleiros: ordem de chegada e fila própria (RN-134 a RN-137, desde 2026-11-20)
+### 4.1 Goleiros: chamada no sorteio, um goleiro por time e rodízio (RN-134 a RN-137, desde 2026-11-20)
 
-Pedido do dono em 2026-11-20, para seguir a dinâmica real do campo. **Substitui RN-19 a RN-21, RN-46, RN-60,
+Pedido do dono em 2026-11-20 (revisado no mesmo dia: a primeira versão deixava goleiro só nos dois times em
+campo; o dono decidiu que os times da fila também recebem goleiro). **Substitui RN-19 a RN-21, RN-46, RN-60,
 RN-70 e RN-78 em toda pelada nova**; peladas criadas antes continuam com o modelo antigo (descrito abaixo).
 
-- **RN-134 — Goleiros fora do sorteio; ordem de chegada.** O sorteio é **só de linha**: goleiros nunca são
-  sorteados nem misturados aos times. Na tela de presença, o admin vê os goleiros presentes numerados
-  (1º, 2º, 3º…) na ordem em que foram marcados e ajusta com ▲ ▼ a **ordem de chegada**. "Novo sorteio" mantém
-  essa ordem. As opções "sortear com/sem goleiros" e "equipe só é completa com goleiro" foram removidas:
-  equipe completa = N jogadores de linha.
-- **RN-135 — Só os dois times em campo têm goleiro.** O 1º goleiro começa no gol do Time 1 e o 2º no do Time 2;
-  os demais aguardam na **fila de goleiros** (`session.gkQueue`). Times da fila não têm goleiro. Os cards dos
-  times em campo mostram quem defende cada um a cada partida, e a tela da partida mostra a fila de goleiros.
-  Sem goleiros, os times jogam sem goleiro; com 1 só, o Time 2 começa sem goleiro (*decisão do dono*).
-- **RN-136 — Rodízio isolado dos goleiros.** A cada resultado, o goleiro **acompanha a decisão do time**: quem
-  permanece (vitória, empate do desafiante, par ou ímpar) fica com o goleiro; o goleiro de quem **sai** vai para
-  o **fim da fila de goleiros**; o time que entra recebe o **1º da fila**. Na saída dupla, os dois goleiros vão
-  para o fim da fila (o do slot A primeiro). Com mais times que goleiros (ex.: 5 times, 3 goleiros), a fila gira
-  na própria ordem. Com 1 goleiro só, ele vai para o fim da fila e volta logo para o time que entra.
-  A explicação do resultado diz quem foi para a fila e quem assumiu o gol. *Decisão do dono:* empate segue a
-  regra dos times.
-- **RN-137 — Atrasado, lesão e ajuste.** Goleiro atrasado entra no **fim da fila de goleiros**; se um time em campo
-  está sem goleiro e não há ninguém esperando, ele assume na hora. Goleiro em campo que se machuca ou vai
-  embora é substituído na hora pelo **1º da fila** (*decisão do dono*); sem ninguém esperando, o time fica sem
-  goleiro. Goleiro da fila que sai apenas deixa a fila. Em 🧤 Goleiros (rascunho e partida), o admin muda a ordem
-  (▲ ▼: os dois primeiros ficam no gol de quem está em campo) ou manda um goleiro para o fim da fila (⤓).
-- Presença e financeiro não mudam (RN-118 a RN-120): todo goleiro da pelada, inclusive quem só esperou na fila,
-  ganha presença para o ranking de goleiros (Top 4); goleiro é isento da taxa e **nunca** gera os R$ 3 automáticos;
-  o cashback dele vem só de aportes livres, que abatem a festa/campeonato pelo mesmo valor da linha.
+- **RN-134 — Goleiros fora da chamada e do sorteio.** A lista de presença mostra **só jogadores de linha** e o
+  sorteio é só de linha. Ao tocar em **Sortear**, abre a janela **"Ordem de chegada dos goleiros"** com os goleiros
+  cadastrados: o admin toca em quem veio, na ordem em que chegou (1º, 2º, 3º…), ajusta com ▲ ▼ / ✕ e confirma;
+  só então o sorteio é feito. A janela já vem com a ordem da última vez. "Novo sorteio" mantém a ordem. As opções
+  "sortear com/sem goleiros" e "equipe só é completa com goleiro" foram removidas: equipe completa = N de linha.
+- **RN-135 — Um goleiro por time, pela ordem de chegada.** O 1º goleiro vai para o Time 1, o 2º para o Time 2,
+  o 3º para o Time 3, e assim por diante, **inclusive times da fila**. Times sem goleiro ficam "aguardando goleiro".
+  Se houver mais goleiros que times, os que sobram **aguardam time** (`session.gkQueue`). Todo card de time (em
+  campo e na fila) mostra o goleiro dele ou "aguardando goleiro".
+- **RN-136 — Rodízio.** Quem permanece em campo (vitória, empate do desafiante, par ou ímpar) mantém o goleiro.
+  O goleiro de quem **sai** vai para o **primeiro time sem goleiro**, na sequência campo (lado A, lado B) → PRO →
+  RE → … Ex.: 5 times e 3 goleiros — Time 1 vence o Time 2; o Goleiro 2 vai para o Time 4 (o Time 3 já tem o
+  Goleiro 3). Na saída dupla, os dois goleiros soltos seguem a mesma sequência (o do lado A primeiro). Goleiro que
+  aguardava time tem prioridade sobre o que acabou de sair (*decisão de implementação: quem esperou mais entra
+  antes*). A explicação do resultado diz para onde foi cada goleiro. Empate segue a regra dos times.
+- **RN-137 — Atrasado, lesão e ajuste.** Goleiro atrasado vai para o **próximo time da sequência sem goleiro**
+  (no exemplo, o Time 5); se todos têm goleiro, aguarda no fim da fila de goleiros. Goleiro que se machuca ou vai
+  embora é substituído pelo primeiro goleiro que aguarda time; sem ninguém aguardando, o time fica sem goleiro
+  até chegar um (*decisão do dono*). Em 🧤 Goleiros (rascunho e partida), ▲ ▼ trocam goleiros de time e ⤓ manda
+  um goleiro para a última posição. Rascunhos criados na primeira versão (goleiro aguardando com time sem
+  goleiro) são corrigidos ao iniciar a pelada.
+- Presença e financeiro não mudam (RN-118 a RN-120): todo goleiro da pelada ganha presença para o ranking de
+  goleiros (Top 4); goleiro é isento da taxa e **nunca** gera os R$ 3 automáticos; o cashback dele vem só de
+  aportes livres, que abatem a festa/campeonato pelo mesmo valor da linha.
 
 **Modelo antigo (peladas anteriores a 2026-11-20):**
 
@@ -703,7 +704,7 @@ Proteções da auditoria de ponto cego (pedido do dono em 2026-11-20):
 
 ---
 
-## 18. Testes automatizados (cobertura atual: 166 testes)
+## 18. Testes automatizados (cobertura atual: 167 testes)
 
 Executar em `tests/index.html` (navegador) ou `node tests/run-node.mjs`.
 

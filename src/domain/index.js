@@ -33,7 +33,7 @@ export { LIMITS, clampLinePerTeam, clampTolerance, clampTransferQty, planPartici
 export {
   DEFAULT_CONFIG, RuleError, createSession, redraw, startSession, finishSession,
   teamPids, linePositions, positionOf, label, isComplete, queueLabel, player, teamStats, lineStarsRef, allTeamsInOrder, validate,
-  usesGkQueue, goalkeeperLineup,
+  usesGkQueue, goalkeeperLineup, goalkeeperPlaces,
 } from './session.js';
 export { SCENARIOS, fieldSituation, analyzeResult, drawHint, advantageStatus } from './tieRules.js';
 export { registerResult, vestPreview } from './rotation.js';

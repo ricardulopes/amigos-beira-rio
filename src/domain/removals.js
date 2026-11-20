@@ -51,7 +51,7 @@ export function removePlayer(state, pid, reason = 'other', note = '') {
       // RN-137: o próximo da fila de goleiros assume na hora; sem ninguém esperando, o time fica sem goleiro.
       const next = s.gkQueue.shift();
       if (next) fromTeam.gks.push(next);
-      moves = [next ? `Goleiro ${s.snapshot[next].name} (1º da fila de goleiros) assumiu o gol do ${fromTeam.label}.` : `Ninguém na fila de goleiros: ${fromTeam.label} fica sem goleiro.`];
+      moves = [next ? `Goleiro ${s.snapshot[next].name} (que aguardava time) assumiu o gol do ${fromTeam.label}.` : `Nenhum goleiro aguardando: ${fromTeam.label} fica sem goleiro até chegar um.`];
       for (const m of moves) addLog(s, 'move', m);
     } else if (fromTeam) {
       refreshRoles(s, fromTeam);
@@ -120,6 +120,8 @@ function nextTeams(s, teamId) {
 /** Remove equipes que ficaram vazias; se o campo ficar com menos de dois, a próxima da fila entra (RN-75). */
 function cleanupEmpty(s, moves) {
   for (const t of allTeamsInOrder(s)) {
+    // Fila de goleiros (RN-135): time sem ninguém de linha é desfeito e o goleiro dele fica solto.
+    if (t.line.length === 0 && usesGkQueue(s) && t.gks.length) s.gkQueue.push(...t.gks.splice(0));
     if (t.line.length === 0 && t.gks.length === 0) {
       removeTeam(s, t.id);
       moves.push(`${t.label} ficou vazio e foi desfeito.`);

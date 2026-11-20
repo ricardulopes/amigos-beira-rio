@@ -55,7 +55,7 @@ suite('Preparação da pelada (setup.js)', () => {
     assert.deepEqual(p.sizes, [5, 5, 5, 5, 1]);
     assert.equal(p.fullCount, 4);
     assert.equal(p.remainder, 1);
-    assert.ok(p.goalkeeperNote.includes('1 aguarda(m) na fila de goleiros'), 'RN-135: 2 em campo, 1 na fila');
+    assert.ok(p.goalkeeperNote.includes('do Time 1 ao Time 3; 2 time(s) aguardando goleiro'), 'RN-135: um goleiro por time, na ordem');
   });
 
   test('Seleção não altera o cadastro e ignora ids desconhecidos', () => {
@@ -67,9 +67,9 @@ suite('Preparação da pelada (setup.js)', () => {
 
   test('Aviso de goleiros (RN-135)', () => {
     assert.equal(goalkeeperNote(2, 0), '');
-    assert.equal(goalkeeperNote(0, 4), 'Nenhum goleiro presente: os times jogam sem goleiro.');
-    assert.equal(goalkeeperNote(2, 4), 'O 1º goleiro começa no Time 1 e o 2º no Time 2.');
-    assert.ok(goalkeeperNote(6, 4).endsWith('4 aguarda(m) na fila de goleiros.'));
+    assert.equal(goalkeeperNote(0, 4), 'Nenhum goleiro presente: os times ficam aguardando goleiro.');
+    assert.equal(goalkeeperNote(4, 4), 'Um goleiro para cada time, pela ordem de chegada.');
+    assert.ok(goalkeeperNote(6, 4).endsWith('2 aguarda(m) time.'));
   });
 
   test('Tolerância: horário recomendado e contagem regressiva (RN-11)', () => {

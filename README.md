@@ -159,9 +159,10 @@ pilha de desfazer.
   completos, jogadores fora da formação desejada (tabela 2–15), e para a equipe incompleta com k atletas:
   soma próxima de **Alvo = M_time − (N − k) × M_atleta** (média dos completos menos as vagas que faltam
   preenchidas por atletas médios) + diversidade de posições (versatilidade se for 1 jogador).
-- Goleiros **não entram no sorteio** (só linha). Na tela de presença, os goleiros marcados aparecem na
-  **ordem de chegada** (1º, 2º, 3º…, ajustável com ▲ ▼): o 1º começa no gol do Time 1, o 2º no do Time 2 e os
-  demais aguardam na **fila de goleiros**.
+- Goleiros **não aparecem na chamada nem entram no sorteio** (só linha). Ao tocar em **Sortear**, abre a janela
+  **"Ordem de chegada dos goleiros"**: toque em quem veio, na ordem de chegada (▲ ▼ ajustam, ✕ tira), e confirme.
+  O 1º goleiro vai para o Time 1, o 2º para o Time 2, o 3º para o Time 3… inclusive times da fila; times sem
+  goleiro ficam "aguardando goleiro".
 - Ordem interna: escalonamento fixo por estrelas (posições de baixo para cima). Com 5: posição 5 = 1º
   melhor, 4 = pior, 3 = 3º, 2 = 4º, 1 = 2º melhor; mesmo padrão generalizado para 2 a 15 atletas e para a
   equipe incompleta. Os mais fortes nunca ficam vizinhos.
@@ -181,11 +182,10 @@ pilha de desfazer.
   **de baixo para cima** (preservando a sequência); o restante forma nova equipe. Não divide se não
   houver vagas.
 - "Completa" = N jogadores de linha.
-- **Goleiros (rodízio próprio):** só os dois times em campo têm goleiro. Quem fica em campo mantém o
-  goleiro; o goleiro de quem sai vai para o **fim da fila de goleiros** e o 1º da fila assume o time que
-  entra (empate segue a regra dos times; na saída dupla, os dois goleiros vão para a fila). Com 5 times e
-  3 goleiros, a fila de goleiros gira sozinha. Os cards em campo mostram o goleiro de cada time e a tela da
-  partida mostra a fila de goleiros (🧤 Goleiros → ▲ ▼ para mudar a ordem, ⤓ para mandar ao fim da fila).
+- **Goleiros (rodízio):** quem fica em campo mantém o goleiro; o goleiro de quem perde vai para o **primeiro
+  time sem goleiro** (campo, PRO, RE…). Ex.: 5 times e 3 goleiros — Time 1 vence o Time 2 e o Goleiro 2 vai
+  para o Time 4. Empate segue a regra dos times. Todo card (campo e fila) mostra o goleiro do time ou
+  "aguardando goleiro"; 🧤 Goleiros troca goleiros de time (▲ ▼ ⤓).
 
 ### Conflito resolvido
 "Par ou ímpar no primeiro jogo" × "PRO e RE completos: saem os dois, regra absoluta". Como a seção 18
@@ -195,12 +195,12 @@ mesmo com PRO e RE completos**.
 
 ### Outras decisões
 - Atrasado de linha entra na base da última equipe da fila se houver vaga; senão abre nova equipe.
-  Goleiro atrasado vai para o fim da fila de goleiros (assume na hora se um time em campo estiver sem goleiro).
+  Goleiro atrasado vai para o próximo time da sequência sem goleiro (se todos tiverem, aguarda time).
 - Saída por lesão, cansaço ou desistência: a vaga é reposta **automaticamente**, na mesma esteira de
   "subir a lista" do rodízio. A posição 1 do Próximo entra no topo do time que perdeu o jogador; a
   posição 1 do Ré vai para o topo do Próximo; a do Tri vai para o Ré, e assim por diante. A vaga termina
-  no último time da fila. Se alguém da fila desiste, só os times de trás sobem. Goleiro em campo é reposto
-  na hora pelo 1º da fila de goleiros (sem ninguém esperando, o time fica sem goleiro). Nenhuma escolha
+  no último time da fila. Se alguém da fila desiste, só os times de trás sobem. Goleiro que sai é reposto
+  pelo goleiro que aguarda time (sem ninguém aguardando, o time fica sem goleiro até chegar um). Nenhuma escolha
   manual; dá para desfazer.
 - Editar o cadastro nunca altera peladas anteriores (cada pelada guarda um snapshot dos jogadores).
 

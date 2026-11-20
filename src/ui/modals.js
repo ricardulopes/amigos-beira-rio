@@ -1,10 +1,10 @@
 // Janelas modais (apresentação). Estado do modal fica em app.ui.modal.
-import { app, activeSession } from './state.js';
+import { app, activeSession, setupState } from './state.js';
 import { esc, fmt, stars, roleBadge, positionsBadges, starPicker, posBadge, vestIcon } from './dom.js';
 import {
   ROLE_NAMES, REMOVAL_REASONS, filterPlayers, allTeamsInOrder, queueLabel, simulateTransfer, teamStats, linePositions, PIN_RULES, ADMIN_ACTIONS, rosterPlanSummary,
   vestOf, vestPreview, financeSettings, resetPreview, formatMoney, currentCycle, cycleRanking, reopenInfo, resetWord,
-  usesGkQueue, goalkeeperLineup,
+  usesGkQueue, goalkeeperLineup, planParticipation,
 } from '../domain/index.js';
 import { pixBlock } from './views.js';
 
@@ -40,6 +40,8 @@ export function renderModal() {
       return swapModal(s, m);
     case 'gk':
       return gkModal(s, m);
+    case 'gkCall':
+      return gkCallModal(m);
     case 'log':
       return shell('Registro de movimentações', `<ol class="log">${s.log.slice().reverse().map((l) => `<li><time>${new Date(l.at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</time> ${esc(l.text)}</li>`).join('')}</ol>`, '', 'tall');
     case 'more':
@@ -379,13 +381,43 @@ function swapModal(s, m) {
   return shell('Trocar jogadores', body, `<button class="btn" data-act="modal-close">Cancelar</button><button class="btn primary" data-act="swap-ok" ${m.a && m.b && m.a !== m.b ? '' : 'disabled'}>Trocar</button>`, 'tall');
 }
 
+/**
+ * RN-134: chamada dos goleiros na hora do sorteio. Toque em quem chegou (entra no fim da ordem),
+ * ajuste com ▲ ▼ e confirme: o sorteio (só de linha) é feito e o 1º goleiro vai para o Time 1, o 2º para o Time 2…
+ */
+function gkCallModal(m) {
+  const st = setupState();
+  const byId = new Map(app.db.players.map((p) => [p.id, p]));
+  const plan = planParticipation(app.db.players, (st.selected || []).filter((id) => byId.get(id)?.type === 'line'), st.config || { linePerTeam: 5 });
+  const teams = plan.teamCount;
+  const order = m.order.filter((id) => byId.has(id));
+  const rows = order.map((id, i) => `<li class="prow">
+      <span class="ord pos">${i + 1}º</span>
+      <div class="grow gk-who"><div class="pname">🧤 ${esc(byId.get(id).name)}</div>
+        <div class="muted small">${i < teams ? `vai para o Time ${i + 1}` : 'aguarda time (todos com goleiro)'}</div></div>
+      <button class="mini" data-act="gkc-move" data-pid="${esc(id)}" data-d="-1" ${i === 0 ? 'disabled' : ''} aria-label="Chegou antes">▲</button>
+      <button class="mini" data-act="gkc-move" data-pid="${esc(id)}" data-d="1" ${i === order.length - 1 ? 'disabled' : ''} aria-label="Chegou depois">▼</button>
+      <button class="mini" data-act="gkc-del" data-pid="${esc(id)}" aria-label="Não veio">✕</button></li>`).join('');
+  const q = (m.query || '').trim().toLowerCase();
+  const rest = app.db.players.filter((p) => p.type === 'gk' && !order.includes(p.id) && (!q || p.name.toLowerCase().includes(q)));
+  const body = `
+    <p class="small">Toque nos goleiros <b>na ordem em que chegaram</b>. O 1º vai para o Time 1, o 2º para o Time 2, e assim por diante
+      (${teams} time(s) neste sorteio). Times sem goleiro ficam aguardando.</p>
+    ${order.length ? `<h4 class="small">Ordem de chegada</h4><ul class="plist editable">${rows}</ul>` : '<p class="muted small">Nenhum goleiro marcado ainda.</p>'}
+    <h4 class="small">Goleiros cadastrados</h4>
+    <input id="m-gkc-q" class="search" type="search" placeholder="Buscar goleiro" data-input="m:query" value="${esc(m.query || '')}" autocomplete="off">
+    <div class="chips">${rest.map((p) => `<button class="chip" data-act="gkc-add" data-pid="${esc(p.id)}">+ 🧤 ${esc(p.name)}</button>`).join('') || '<span class="muted small">Todos os goleiros já foram marcados.</span>'}</div>`;
+  return shell('Ordem de chegada dos goleiros', body,
+    `<button class="btn" data-act="modal-close">Voltar</button><button class="btn primary" data-act="gkc-ok">${order.length ? `Confirmar ${order.length} e sortear` : 'Sortear sem goleiros'}</button>`, 'tall');
+}
+
 function gkModal(s, m) {
   if (usesGkQueue(s)) {
-    // RN-137: ordem dos goleiros do dia — os dois primeiros no gol de quem está em campo, depois a fila.
+    // RN-137: ordem dos goleiros do dia — pelos times que têm goleiro (campo, PRO, RE…), depois quem aguarda time.
     const lineup = goalkeeperLineup(s);
     const where = (g) => {
-      const t = s.field.find((id) => s.teams[id].gks[0] === g);
-      return t ? `no gol do <b>${esc(s.teams[t].label)}</b>` : `${s.gkQueue.indexOf(g) + 1}º da fila`;
+      const t = [...s.field, ...s.queue].find((id) => s.teams[id].gks[0] === g);
+      return t ? `no gol do <b>${esc(s.teams[t].label)}</b> · ${queueLabel(s, t)}` : `aguardando time (${s.gkQueue.indexOf(g) + 1}º)`;
     };
     const rows = lineup.map((g, i) => `<li class="prow">
         <span class="ord pos">${i + 1}º</span><div class="grow gk-who"><div class="pname">🧤 ${esc(s.snapshot[g].name)}</div><div class="muted small">${where(g)}</div></div>
@@ -393,7 +425,7 @@ function gkModal(s, m) {
         <button class="mini" data-act="gk-line" data-pid="${g}" data-to="${i + 2}" ${i === lineup.length - 1 ? 'disabled' : ''} aria-label="Descer">▼</button>
         <button class="mini" data-act="gk-line" data-pid="${g}" data-to="end" ${i === lineup.length - 1 ? 'disabled' : ''} aria-label="Fim da fila">⤓</button></li>`).join('');
     const body = lineup.length
-      ? `<p class="muted small">Goleiros não acompanham os times da fila: quem perde sai e o goleiro dele vai para o fim da fila; o 1º da fila assume o time que entra. ▲▼ mudam a ordem; ⤓ manda para o fim da fila (ex.: goleiro atrasado).</p>
+      ? `<p class="muted small">Quem vence mantém o goleiro; o goleiro de quem perde vai para o primeiro time sem goleiro (campo, PRO, RE…). ▲▼ trocam os goleiros de time; ⤓ manda para a última posição.</p>
         <ul class="plist editable">${rows}</ul>`
       : '<p>Nenhum goleiro participando. Goleiro que chegar atrasado entra por "+ Atrasado".</p>';
     return shell('Goleiros', body, '<button class="btn primary" data-act="modal-close">Pronto</button>', 'tall');

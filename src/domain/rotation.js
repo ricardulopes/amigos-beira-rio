@@ -1,7 +1,7 @@
 // Rodízio: aplica o resultado decidido em tieRules.js (PRD seções 8 e 9).
 // Atualiza estatísticas e permanência, envia quem sai ao fim da fila (com divisão/recomposição)
 // e coloca em campo os próximos da fila.
-import { RuleError, transact, label, nowIso, teamSnapshot, addLog, refreshRoles, makeTeam, usesGkQueue, syncGoalkeepers } from './session.js';
+import { RuleError, transact, label, nowIso, teamSnapshot, addLog, refreshRoles, makeTeam, usesGkQueue, syncGoalkeepers, goalkeeperPlaces } from './session.js';
 import { analyzeResult, SCENARIOS } from './tieRules.js';
 import { syncVests, vestOf, vestsText } from './vests.js';
 
@@ -62,13 +62,14 @@ export function registerResult(state, result, opts = {}) {
     const fieldBefore = [...s.field];
     s.field = s.field.filter((id) => staying.includes(id));
     const moves = [];
-    // RN-136: o goleiro de quem sai vai para o fim da fila de goleiros (quem fica mantém o seu).
+    // RN-136: o goleiro de quem sai fica solto e vai para o primeiro time sem goleiro (quem fica mantém o seu).
     const gkOut = [];
+    const waitingBefore = usesGkQueue(s) ? [...s.gkQueue] : [];
     if (usesGkQueue(s)) {
       for (const id of leaving) {
         for (const g of s.teams[id].gks.splice(0)) {
           s.gkQueue.push(g);
-          gkOut.push(`${s.snapshot[g].name} (${label(s, id)})`);
+          gkOut.push({ g, from: label(s, id) });
         }
       }
     }
@@ -85,17 +86,16 @@ export function registerResult(state, result, opts = {}) {
     }
     s.field = newField.filter(Boolean);
 
-    // 3b) goleiros: quem entra recebe o próximo da fila de goleiros (RN-136)
+    // 3b) goleiros soltos vão para os times sem goleiro, na ordem campo → PRO → RE… (RN-136)
     if (usesGkQueue(s)) {
       syncGoalkeepers(s);
-      const gkIn = s.field.filter((id) => !staying.includes(id) && s.teams[id].gks.length)
-        .map((id) => `${s.snapshot[s.teams[id].gks[0]].name} assume o gol do ${label(s, id)}`);
-      if (gkOut.length || gkIn.length) {
-        const parts = [];
-        if (gkOut.length) parts.push(`${gkOut.join(' e ')} ${gkOut.length > 1 ? 'vão' : 'vai'} para o fim da fila de goleiros`);
-        if (gkIn.length) parts.push(gkIn.join('; '));
-        explanation += ` Goleiros: ${parts.join('; ')}.`;
-      }
+      const where = goalkeeperPlaces(s);
+      const dest = (g) => (where[g] ? `foi para o ${label(s, where[g])}` : 'aguarda time (todos têm goleiro)');
+      const parts = [
+        ...waitingBefore.filter((g) => where[g]).map((g) => `${s.snapshot[g].name}, que aguardava, foi para o ${label(s, where[g])}`),
+        ...gkOut.map(({ g, from }) => `${s.snapshot[g].name} (goleiro do ${from}) ${dest(g)}`),
+      ];
+      if (parts.length) explanation += ` Goleiros: ${parts.join('; ')}.`;
     }
 
     // 4) coletes: quem fica mantém a cor; quem entra veste a cor de quem saiu (RN-109 a RN-111)

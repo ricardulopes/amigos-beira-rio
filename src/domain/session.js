@@ -95,7 +95,7 @@ function applyDraw(s, draw, gkOrder = []) {
   s.field = ids.slice(0, 2);
   s.queue = ids.slice(2);
   s.gkQueue = gkOrder.filter((pid) => s.snapshot[pid]?.type === 'gk');
-  syncGoalkeepers(s); // 1º goleiro no Time 1, 2º no Time 2; os demais aguardam
+  syncGoalkeepers(s); // 1º goleiro no Time 1, 2º no Time 2, 3º no Time 3…; sobra aguarda time
   s.vests = {};
   syncVests(s); // RN-108: Time 1 começa de Amarelo e Time 2 de Azul
   s.active = [...ids.flatMap((id) => teamPids(s.teams[id])), ...s.gkQueue, ...s.bench];
@@ -123,6 +123,7 @@ export function startSession(state) {
   if (s.field.length < 2) throw new RuleError('São necessárias ao menos duas equipes para começar.');
   s.status = 'live';
   s.startedAt = nowIso();
+  syncGoalkeepers(s); // rascunho em formato anterior: goleiro que aguardava vai para o time sem goleiro
   addLog(s, 'start', `Pelada iniciada: ${label(s, s.field[0])} x ${label(s, s.field[1])}.`);
   validate(s);
   return s;
@@ -175,30 +176,35 @@ export function isComplete(s, team) {
 export const usesGkQueue = (s) => Array.isArray(s.gkQueue);
 
 /**
- * RN-135: só as duas equipes em campo têm goleiro; os demais aguardam em `gkQueue`, em ordem.
- * Goleiro de equipe que foi para a fila vai para o fim da fila de goleiros (na ordem em que as equipes
- * entraram na fila); equipe em campo sem goleiro recebe o primeiro da fila (slot A antes do B).
+ * RN-135/RN-136: cada equipe tem no máximo um goleiro (em campo ou na fila). Goleiros "soltos" ficam em
+ * `gkQueue` (goleiros aguardando time) e vão, em ordem, para as equipes sem goleiro na sequência
+ * campo (slot A, slot B) → PRO → RE → … (a primeira equipe sem goleiro recebe o primeiro da espera).
  */
 export function syncGoalkeepers(s) {
   if (!usesGkQueue(s)) return;
-  for (const id of s.queue) {
-    const t = s.teams[id];
-    if (t.gks.length) s.gkQueue.push(...t.gks.splice(0));
-  }
-  for (const id of s.field) {
+  const order = [...s.field, ...s.queue];
+  for (const id of order) {
     const t = s.teams[id];
     if (t.gks.length > 1) s.gkQueue.push(...t.gks.splice(1));
   }
-  for (const id of s.field) {
+  for (const id of order) {
     const t = s.teams[id];
     if (!t.gks.length && s.gkQueue.length) t.gks.push(s.gkQueue.shift());
   }
 }
 
-/** Ordem completa dos goleiros: os de campo (slot A, slot B) e depois a fila de espera. */
+/** Ordem dos goleiros: os das equipes (campo, PRO, RE…) e depois os que aguardam time. */
 export function goalkeeperLineup(s) {
   if (!usesGkQueue(s)) return Object.values(s.teams).flatMap((t) => t.gks);
-  return [...s.field.flatMap((id) => s.teams[id].gks), ...s.gkQueue];
+  return [...[...s.field, ...s.queue].flatMap((id) => s.teams[id].gks), ...s.gkQueue];
+}
+
+/** Onde está cada goleiro agora: id da equipe, ou null se aguarda time (para textos de explicação). */
+export function goalkeeperPlaces(s) {
+  const out = {};
+  for (const t of Object.values(s.teams)) for (const g of t.gks) out[g] = t.id;
+  for (const g of s.gkQueue || []) out[g] = null;
+  return out;
 }
 
 /** Rótulo dinâmico de cada equipe: EM JOGO, PRO, RE, TRI, 4º, 5º... */
@@ -289,13 +295,14 @@ export function validate(s) {
   }
   for (const b of s.bench) place(b, 'reserva');
   if (usesGkQueue(s)) {
-    // RN-135: goleiro só nas equipes em campo (no máximo um); o resto na fila de goleiros.
+    // RN-135: no máximo um goleiro por equipe; quem sobra aguarda time (e só se todas tiverem goleiro).
     for (const g of s.gkQueue) {
       if (s.snapshot[g]?.type !== 'gk') fail(`${s.snapshot[g]?.name || g} na fila de goleiros não é goleiro.`);
       place(g, 'fila de goleiros');
     }
-    for (const id of s.queue) if (s.teams[id].gks.length) fail(`${label(s, id)} está na fila com goleiro.`);
-    for (const id of s.field) if (s.teams[id].gks.length > 1) fail(`${label(s, id)} com mais de um goleiro.`);
+    for (const id of order) if (s.teams[id].gks.length > 1) fail(`${label(s, id)} com mais de um goleiro.`);
+    // (Goleiro aguardando com time sem goleiro não é erro: rascunhos de 2026-11-20 cedo usavam esse formato;
+    // syncGoalkeepers corrige na próxima operação ou ao iniciar.)
   }
   if (s.vests) {
     // RN-109: as duas equipes em campo vestem lados diferentes do colete.

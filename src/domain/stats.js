@@ -63,10 +63,7 @@ export function balanceSummary(s) {
     median: ref.median,
     mAthlete: ref.mean,
     forming,
-    // RN-135: na fila de goleiros, só as equipes em campo precisam de goleiro.
-    withoutGk: usesGkQueue(s)
-      ? s.field.filter((id) => !s.teams[id].gks.length).map((id) => s.teams[id].label)
-      : s.config.useGoalkeepers ? teams.filter((t) => !t.gks.length).map((t) => t.label) : [],
+    withoutGk: usesGkQueue(s) || s.config.useGoalkeepers ? teams.filter((t) => !t.gks.length).map((t) => t.label) : [],
   };
 }
 

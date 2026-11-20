@@ -75,13 +75,13 @@ export function moveInGoalkeeperOrder(order, pid, delta) {
   return list;
 }
 
-/** Texto sobre os goleiros do dia (RN-135): os dois primeiros começam em campo; os demais aguardam. */
+/** Texto sobre os goleiros do dia (RN-135): o 1º vai para o Time 1, o 2º para o Time 2, e assim por diante. */
 export function goalkeeperNote(gkCount, teamCount) {
   if (!teamCount) return '';
-  if (gkCount === 0) return 'Nenhum goleiro presente: os times jogam sem goleiro.';
-  if (gkCount === 1) return 'Só 1 goleiro: começa no gol do Time 1; o Time 2 fica sem goleiro.';
-  if (gkCount === 2) return 'O 1º goleiro começa no Time 1 e o 2º no Time 2.';
-  return `O 1º goleiro começa no Time 1 e o 2º no Time 2; ${gkCount - 2} aguarda(m) na fila de goleiros.`;
+  if (gkCount === 0) return 'Nenhum goleiro presente: os times ficam aguardando goleiro.';
+  if (gkCount < teamCount) return `${gkCount} goleiro(s): do Time 1 ao Time ${gkCount}; ${teamCount - gkCount} time(s) aguardando goleiro.`;
+  if (gkCount === teamCount) return 'Um goleiro para cada time, pela ordem de chegada.';
+  return `Um goleiro para cada time; ${gkCount - teamCount} aguarda(m) time.`;
 }
 
 /**

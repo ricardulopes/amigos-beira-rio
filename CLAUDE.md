@@ -51,8 +51,9 @@ src/domain/    REGRAS DE NEGÓCIO PURAS. Sem DOM, sem navegador, sem armazenamen
   draw.js        sorteio (simulated annealing), goleiros, ordem estratégica, grupos de saída
   setup.js       plano da pelada, aviso de goleiros, tolerância, limites (clamp*), prepareDraw
   session.js     estado da pelada: criação, consultas, validate(), transact(), utilitários internos;
-                 fila de goleiros (`gkQueue`, `syncGoalkeepers` no transact): só os 2 times em campo têm
-                 goleiro (RN-134 a RN-137). Pelada sem `gkQueue` = modelo antigo (goleiro preso ao time)
+                 goleiros (RN-134 a RN-137): um por time pela ordem de chegada (campo → PRO → RE…), sobra em
+                 `gkQueue`; `syncGoalkeepers` no transact põe goleiro solto no 1º time sem goleiro.
+                 Pelada sem `gkQueue` = modelo antigo (goleiro sorteado e preso ao time)
   tieRules.js    DECISÃO de vitória/empate (analyzeResult, drawHint, advantageStatus) — não altera estado
   rotation.js    APLICAÇÃO do resultado (registerResult): permanência, fila, divisão/recomposição
   vests.js       coletes Amarelo/Azul do campo (RN-108 a RN-111); sincronizados em transact()
@@ -157,7 +158,7 @@ tests/         harness próprio + suítes (*.test.js) + runner de navegador e de
 ## Testes (obrigatório)
 
 - Toda mudança em regra de negócio exige teste novo ou atualizado em `tests/` **antes** de considerar
-  pronto, e toda a suíte precisa passar (hoje: 166 testes). Testes do domínio importam de
+  pronto, e toda a suíte precisa passar (hoje: 167 testes). Testes do domínio importam de
   `../src/domain/index.js`, nunca da interface.
 - Regras de empate/rodízio: testar o **estado interno** (field, queue, permanence, stats, composição
   das equipes), não só textos. Valores em dinheiro: sempre centavos inteiros (`formatMoney`/`parseMoney`). Use `mkSession(sizes, {goalkeepers, config, stars})` de `tests/helpers.js` (`goalkeepers: k` = fila de goleiros; `gks: [...]` = modelo antigo) para

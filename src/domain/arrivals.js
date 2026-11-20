@@ -1,5 +1,5 @@
 // Jogadores atrasados (PRD seção 10): ordem de chegada, sem novo sorteio e sem reorganizar equipes.
-import { RuleError, transact, clone, nowIso, makeTeam, refreshRoles, fillField, addLog, usesGkQueue } from './session.js';
+import { RuleError, transact, clone, nowIso, makeTeam, refreshRoles, fillField, addLog, usesGkQueue, syncGoalkeepers, goalkeeperPlaces } from './session.js';
 import { balanceWarnings } from './balance.js';
 
 /**
@@ -21,14 +21,14 @@ export function addLatePlayer(state, snap) {
     const warnings = [];
     let text;
     if (snap.type === 'gk' && usesGkQueue(s)) {
-      // RN-137: goleiro atrasado vai para o fim da fila de goleiros; se um time em campo está sem
-      // goleiro, ele assume na hora (syncGoalkeepers, no fim da transação).
+      // RN-137: goleiro atrasado vai para o próximo time da sequência (campo → PRO → RE…) sem goleiro;
+      // se todos têm goleiro, aguarda no fim da fila de goleiros.
       s.gkQueue.push(snap.id);
-      const pos = s.gkQueue.length;
-      const fieldWithout = s.field.find((id) => !s.teams[id].gks.length);
-      text = fieldWithout && pos === 1
-        ? `${snap.name} (goleiro) chegou (${order}º atrasado) e assumiu o gol do ${s.teams[fieldWithout].label}.`
-        : `${snap.name} (goleiro) chegou (${order}º atrasado) e entrou no fim da fila de goleiros (${pos}º da fila).`;
+      syncGoalkeepers(s);
+      const at = goalkeeperPlaces(s)[snap.id];
+      text = at
+        ? `${snap.name} (goleiro) chegou (${order}º atrasado) e foi para o gol do ${s.teams[at].label}.`
+        : `${snap.name} (goleiro) chegou (${order}º atrasado); todos os times já têm goleiro e ele aguarda no fim da fila de goleiros (${s.gkQueue.indexOf(snap.id) + 1}º).`;
     } else if (snap.type === 'gk') {
       if (!s.config.useGoalkeepers) {
         s.bench.push(snap.id);

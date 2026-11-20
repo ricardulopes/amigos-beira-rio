@@ -53,6 +53,7 @@ export function transferPlayers(state, fromId, toId, qty) {
     const detail = sim.moving.map((x) => `${x.name} pos. ${x.fromPosition} → ${x.toPosition}`).join(', ');
     const moved = sim.moving;
     const text = `Transferência ${from.label} → ${to.label}: ${detail}.`;
+    if (from.line.length === 0 && usesGkQueue(s)) s.gkQueue.push(...from.gks.splice(0)); // goleiro fica solto (RN-135)
     if (from.line.length === 0 && from.gks.length === 0) {
       removeTeam(s, fromId);
       fillField(s);
@@ -119,25 +120,26 @@ export function moveGoalkeeper(state, pid, toId) {
 }
 
 /**
- * RN-137: muda a posição de um goleiro na ordem do dia (goleiros em campo primeiro, depois a fila).
- * `to` = nova posição 1, 2, 3… (1 = gol do 1º time em campo) ou 'end' (fim da fila de goleiros).
- * Os dois primeiros da ordem ficam no gol das equipes em campo; os demais aguardam.
+ * RN-137: muda a posição de um goleiro na ordem do dia. A ordem segue as vagas de goleiro existentes
+ * (times com goleiro: campo → PRO → RE…, depois quem aguarda time); mudar a posição troca os goleiros
+ * de time, sem criar nem tirar vaga. `to` = nova posição 1, 2, 3… ou 'end' (última posição).
  */
 export function moveGoalkeeperInLineup(state, pid, to) {
   return transact(state, (s) => {
     if (!usesGkQueue(s)) throw new RuleError('Esta pelada usa o modelo antigo de goleiros.');
+    const slots = [...s.field, ...s.queue].filter((id) => s.teams[id].gks.length);
     const lineup = goalkeeperLineup(s);
     const from = lineup.indexOf(pid);
     if (from < 0) throw new RuleError('Goleiro não encontrado.');
     lineup.splice(from, 1);
     const idx = to === 'end' ? lineup.length : Math.max(0, Math.min(lineup.length, Number(to) - 1));
     lineup.splice(idx, 0, pid);
-    for (const id of s.field) s.teams[id].gks = lineup.length ? [lineup.shift()] : [];
+    for (const id of slots) s.teams[id].gks = [lineup.shift()];
     s.gkQueue = lineup;
-    const place = s.field.find((id) => s.teams[id].gks[0] === pid);
+    const place = slots.find((id) => s.teams[id].gks[0] === pid);
     const text = place
       ? `Goleiro ${s.snapshot[pid].name} passou para o gol do ${s.teams[place].label}.`
-      : `Goleiro ${s.snapshot[pid].name} passou a ser o ${s.gkQueue.indexOf(pid) + 1}º da fila de goleiros.`;
+      : `Goleiro ${s.snapshot[pid].name} passou a ser o ${s.gkQueue.indexOf(pid) + 1}º aguardando time.`;
     addLog(s, 'gk', text);
     return { message: text };
   });

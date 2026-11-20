@@ -22,9 +22,10 @@ técnicos, no [CLAUDE.md](CLAUDE.md).
 - [x] Teste de isolamento: o domínio não usa DOM/navegador/armazenamento e a interface só o acessa por `index.js`.
 - [x] Servidor local em PowerShell (`tools/serve.ps1`) e geração de ícones (`tools/make-icons.ps1`).
 - [x] Documentação: README.md, PRD.md (137 regras), CLAUDE.md, TASKS.md.
-- [x] 166 testes automatizados passando (navegador e Node).
-- [x] Goleiros fora do sorteio, ordem de chegada, fila de goleiros e rodízio próprio (RN-134 a RN-137, 2026-11-20).
-- [ ] Usar a fila de goleiros numa pelada real e revisar com o dono (5 times × 3 goleiros, atrasado, lesão).
+- [x] 167 testes automatizados passando (navegador e Node).
+- [x] Goleiros fora da chamada e do sorteio; janela "Ordem de chegada dos goleiros" ao sortear; um goleiro por
+      time (campo e fila); perdedor leva o goleiro ao 1º time sem goleiro (RN-134 a RN-137, 2026-11-20).
+- [ ] Usar numa pelada real e revisar com o dono (5 times × 3 goleiros, atrasado, lesão, mais goleiros que times).
 - [x] Banco unificado no Supabase com PIN mestre, fila offline e Realtime (RN-113 a RN-117).
 - [x] Visitante só lê; toda alteração exige o PIN mestre; código do jogador removido (RN-116, 2026-11-19).
 - [x] Rodar `supabase/schema.sql` no Supabase e definir o PIN mestre (dono).
