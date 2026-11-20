@@ -1,17 +1,22 @@
 // Regras de resultado e EMPATE (PRD seção 9). Só DECIDE o que acontece — não altera o estado.
 // A aplicação da movimentação fica em rotation.js.
 //
-// Ordem de decisão do empate:
-//   1. PRO e RE completos               → DRAW_DOUBLE_EXIT     (RN-54/55)  saem os dois, sempre
-//   2. ninguém em campo com permanência → DRAW_TOSS            (RN-56)     par ou ímpar
-//   3. alguém defende permanência        → DRAW_CHALLENGER_STAYS (RN-57/58) desafiante fica
-// Exceção configurável (RN-62): no 1º jogo, sem permanência, par ou ímpar mesmo com PRO e RE completos.
+// Ordem de decisão do empate (automática, sem opção em Ajustes):
+//   1º jogo, sempre par ou ímpar (RN-56):
+//     PRO e RE completos                → DRAW_TOSS_DOUBLE_EXIT  saem os dois; vencedor do par ou ímpar volta antes à fila
+//     senão                              → DRAW_TOSS              vencedor do par ou ímpar fica, perdedor sai
+//   Do 2º jogo em diante, nunca par ou ímpar (RN-138):
+//     PRO e RE completos                → DRAW_DOUBLE_EXIT       (RN-54/55) saem os dois; desafiante (ou quem entrou 1º) volta antes
+//     ninguém com permanência            → DRAW_ENTRY_ORDER       quem entrou primeiro (slot A) fica
+//     alguém defende permanência         → DRAW_CHALLENGER_STAYS  (RN-57/58) desafiante fica
 import { RuleError, isComplete } from './session.js';
 
 export const SCENARIOS = {
   WIN: 'WIN',
   DRAW_DOUBLE_EXIT: 'DRAW_DOUBLE_EXIT',
   DRAW_TOSS: 'DRAW_TOSS',
+  DRAW_TOSS_DOUBLE_EXIT: 'DRAW_TOSS_DOUBLE_EXIT',
+  DRAW_ENTRY_ORDER: 'DRAW_ENTRY_ORDER',
   DRAW_CHALLENGER_STAYS: 'DRAW_CHALLENGER_STAYS',
 };
 
@@ -60,10 +65,36 @@ export function analyzeResult(s, result) {
 
   const doubleExit = proComplete && reComplete;
   const noAdvantage = !A.permanence && !B.permanence;
-  const forceToss = isFirstGame && noAdvantage && s.config.tossOnFirstGameEvenWithTwoWaiting;
+  const both = `${A.label} e ${B.label}`;
 
-  if (doubleExit && !forceToss) {
-    // RN-55: desafiante sem permanência volta à fila antes do defensor.
+  // RN-56: no 1º jogo o empate SEMPRE vai para o par ou ímpar (automático; a antiga opção de Ajustes saiu).
+  if (isFirstGame) {
+    if (doubleExit) {
+      return {
+        ...base,
+        scenario: SCENARIOS.DRAW_TOSS_DOUBLE_EXIT,
+        staying: [],
+        leaving: null,
+        needsToss: true,
+        explanation:
+          `Empate no primeiro jogo com PRO (${pro.label}) e RE (${re.label}) completos: ${both} saem e ${pro.label} e ${re.label} entram. ` +
+          'O par ou ímpar decide só a ordem na fila: o vencedor volta à fila na frente do perdedor.',
+      };
+    }
+    return {
+      ...base,
+      scenario: SCENARIOS.DRAW_TOSS,
+      staying: null,
+      leaving: null,
+      needsToss: true,
+      explanation: 'Empate no primeiro jogo: decidir no par ou ímpar. O vencedor permanece com vantagem de permanência; o perdedor sai.',
+    };
+  }
+
+  // Do 2º jogo em diante não há par ou ímpar (RN-138).
+  if (doubleExit) {
+    // RN-55: desafiante sem permanência volta à fila antes do defensor; times que entraram juntos
+    // voltam na ordem em que entraram (slot A entrou primeiro).
     const leaving = A.permanence && !B.permanence ? [B.id, A.id] : [A.id, B.id];
     return {
       ...base,
@@ -74,20 +105,21 @@ export function analyzeResult(s, result) {
       explanation:
         `Empate com PRO (${pro.label}) e RE (${re.label}) completos aguardando: os dois times em campo saem, ` +
         `independentemente de vitórias ou permanência anteriores. ${pro.label} e ${re.label} entram; ` +
-        `${s.teams[leaving[0]].label} e ${s.teams[leaving[1]].label} vão para o fim da fila nessa ordem.`,
+        `${s.teams[leaving[0]].label} e ${s.teams[leaving[1]].label} vão para o fim da fila nessa ordem` +
+        (noAdvantage ? ' (ordem em que entraram).' : ' (preferência do desafiante).'),
     };
   }
   if (noAdvantage) {
+    // RN-138 (decisão do dono): sem permanência e sem saída dupla, fica quem entrou primeiro (slot A).
     return {
       ...base,
-      scenario: SCENARIOS.DRAW_TOSS,
-      staying: null,
-      leaving: null,
-      needsToss: true,
+      scenario: SCENARIOS.DRAW_ENTRY_ORDER,
+      staying: [A.id],
+      leaving: [B.id],
+      needsToss: false,
       explanation:
-        (isFirstGame ? 'Empate no primeiro jogo' : 'Empate sem nenhum time com permanência estabelecida') +
-        ': decidir no par ou ímpar. O vencedor permanece com vantagem de permanência; o perdedor sai.' +
-        (doubleExit && forceToss ? ' (Configuração: par ou ímpar no 1º jogo mesmo com dois completos aguardando.)' : ''),
+        `Empate sem nenhum time com permanência e sem PRO e RE completos: não há par ou ímpar depois do 1º jogo. ` +
+        `${A.label} entrou primeiro, permanece e passa a defender a permanência; ${B.label} sai para o fim da fila.`,
     };
   }
   const defender = A.permanence ? A : B;
@@ -113,9 +145,12 @@ export function analyzeResult(s, result) {
 export function drawHint(s) {
   try {
     const an = analyzeResult(s, 'draw');
-    if (an.scenario === SCENARIOS.DRAW_DOUBLE_EXIT) return 'Se empatar: PRO e RE estão completos → saem os dois times.';
-    if (an.scenario === SCENARIOS.DRAW_TOSS) return 'Se empatar: ninguém tem permanência → par ou ímpar.';
-    return `Se empatar: ${s.teams[an.staying[0]].label} (desafiante*) joga pelo empate e fica.`;
+    const L = (id) => s.teams[id].label;
+    if (an.scenario === SCENARIOS.DRAW_TOSS_DOUBLE_EXIT) return 'Se empatar: 1º jogo → par ou ímpar; PRO e RE completos → saem os dois e o vencedor volta antes à fila.';
+    if (an.scenario === SCENARIOS.DRAW_TOSS) return 'Se empatar: 1º jogo → par ou ímpar; o vencedor fica.';
+    if (an.scenario === SCENARIOS.DRAW_DOUBLE_EXIT) return `Se empatar: PRO e RE estão completos → saem os dois times (${L(an.leaving[0])} volta antes à fila).`;
+    if (an.scenario === SCENARIOS.DRAW_ENTRY_ORDER) return `Se empatar: ${L(an.staying[0])} entrou primeiro e fica.`;
+    return `Se empatar: ${L(an.staying[0])} (desafiante*) joga pelo empate e fica.`;
   } catch {
     return '';
   }

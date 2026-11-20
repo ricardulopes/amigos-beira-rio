@@ -97,12 +97,12 @@ suite('Preparação da pelada (setup.js)', () => {
       players,
       selectedIds: players.map((x) => x.id),
       config: { linePerTeam: 5, useGoalkeepers: true, requireGkForComplete: false },
-      settings: { toleranceMin: 15, tossOnFirstGameEvenWithTwoWaiting: true },
+      settings: { toleranceMin: 15, tossOnFirstGameEvenWithTwoWaiting: true }, // opção antiga: ignorada
       seed: 3,
     });
     assert.equal(Object.keys(r.snapshots).length, 24);
     assert.equal(r.config.toleranceMin, 15);
-    assert.equal(r.config.tossOnFirstGameEvenWithTwoWaiting, true);
+    assert.ok(!('tossOnFirstGameEvenWithTwoWaiting' in r.config), 'par ou ímpar do 1º jogo é automático (sem opção)');
     assert.equal(r.draw.teams.length, 5);
     assert.ok(r.draw.teams.every((t) => !t.gks.length), 'RN-134: goleiros fora do sorteio de linha');
     assert.equal(r.gkOrder.length, 3, 'os 3 goleiros vão para a ordem de chegada');

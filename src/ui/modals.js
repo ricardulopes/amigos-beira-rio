@@ -282,7 +282,9 @@ function resultModal(s, m) {
         <button class="btn win big v-${vestOf(s, a.id)}" data-act="toss" data-t="${a.id}">${vestIcon(vestOf(s, a.id), 'sm')}${esc(a.label)}</button>
         <button class="btn win big v-${vestOf(s, b.id)}" data-act="toss" data-t="${b.id}">${vestIcon(vestOf(s, b.id), 'sm')}${esc(b.label)}</button>
       </div>
-      <p class="muted small">Quem vencer o par ou ímpar continua com o colete que está vestindo; quem entrar veste a cor de quem saiu.</p>`, '<button class="btn" data-act="modal-close">Cancelar</button>');
+      <p class="muted small">${an.staying && an.staying.length === 0
+    ? 'Os dois times saem; quem vencer o par ou ímpar sobe na fila na frente do outro. Quem entra veste a cor de quem saiu.'
+    : 'Quem vencer o par ou ímpar continua com o colete que está vestindo; quem entrar veste a cor de quem saiu.'}</p>`, '<button class="btn" data-act="modal-close">Cancelar</button>');
   }
   const preview = vestPreview(s, m.r);
   return shell(

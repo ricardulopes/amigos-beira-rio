@@ -9,7 +9,7 @@ const perm = (s, id) => s.teams[id].permanence;
 const byPos = (s, tid) => linePositions(s.teams[tid]).map((x) => x.pid);
 
 suite('Empates — seção 22', () => {
-  test('1. Primeiro jogo empatado (≤1 completo aguardando) exige par ou ímpar', () => {
+  test('1. Primeiro jogo empatado (≤1 completo aguardando): par ou ímpar, vencedor fica', () => {
     const s = mkSession([5, 5, 5]);
     const an = analyzeResult(s, 'draw');
     assert.equal(an.scenario, 'DRAW_TOSS');
@@ -24,14 +24,65 @@ suite('Empates — seção 22', () => {
     assert.equal(s2.teams.t2.stats.wins, 0, 'par ou ímpar não é vitória oficial');
   });
 
-  test('1b. Primeiro jogo com PRO e RE completos: saída dupla prevalece (padrão)', () => {
+  test('1b. Primeiro jogo com PRO e RE completos: par ou ímpar obrigatório, saem os dois e o vencedor sobe antes', () => {
     const s = mkSession([5, 5, 5, 5]);
-    assert.equal(analyzeResult(s, 'draw').scenario, 'DRAW_DOUBLE_EXIT');
+    const an = analyzeResult(s, 'draw');
+    assert.equal(an.scenario, 'DRAW_TOSS_DOUBLE_EXIT');
+    assert.ok(an.needsToss);
+    assert.throws(() => registerResult(s, 'draw'), /par ou ímpar/);
+    const s2 = R(s, 'draw', { tossWinner: 't2' });
+    assert.deepEqual(s2.field, ['t3', 't4'], 'PRO e RE entram');
+    assert.deepEqual(s2.queue, ['t2', 't1'], 'vencedor do par ou ímpar (t2) volta à fila na frente do perdedor');
+    assert.ok(!perm(s2, 't1') && !perm(s2, 't2') && !perm(s2, 't3') && !perm(s2, 't4'));
+    assert.equal(s2.teams.t2.stats.tossWins, 1);
+    assert.equal(s2.teams.t1.stats.tossWins, 0);
+    assert.equal(s2.games[0].toss, 't2');
+    const s3 = R(s, 'draw', { tossWinner: 't1' });
+    assert.deepEqual(s3.queue, ['t1', 't2']);
   });
 
-  test('1c. Configuração opcional: par ou ímpar no 1º jogo mesmo com dois completos', () => {
-    const s = mkSession([5, 5, 5, 5], { config: { tossOnFirstGameEvenWithTwoWaiting: true } });
-    assert.equal(analyzeResult(s, 'draw').scenario, 'DRAW_TOSS');
+  test('1c. Par ou ímpar do 1º jogo é automático: a antiga opção de Ajustes é ignorada', () => {
+    const off = mkSession([5, 5, 5, 5], { config: { tossOnFirstGameEvenWithTwoWaiting: false } });
+    const on = mkSession([5, 5, 5, 5], { config: { tossOnFirstGameEvenWithTwoWaiting: true } });
+    assert.equal(analyzeResult(off, 'draw').scenario, 'DRAW_TOSS_DOUBLE_EXIT');
+    assert.equal(analyzeResult(on, 'draw').scenario, 'DRAW_TOSS_DOUBLE_EXIT');
+  });
+
+  test('1d. Do 2º jogo em diante não há par ou ímpar: times que entraram juntos saem na ordem de entrada', () => {
+    let s = mkSession([5, 5, 5, 5, 5, 5]);
+    s = R(s, 'draw', { tossWinner: 't2' }); // 1º jogo: saem t1 e t2; entram t3 e t4
+    assert.deepEqual(s.field, ['t3', 't4']);
+    const an = analyzeResult(s, 'draw');
+    assert.equal(an.scenario, 'DRAW_DOUBLE_EXIT');
+    assert.ok(!an.needsToss);
+    s = R(s, 'draw');
+    assert.deepEqual(s.field, ['t5', 't6']);
+    assert.deepEqual(s.queue, ['t2', 't1', 't3', 't4'], 't3 (entrou primeiro) antes de t4');
+    assert.equal(s.games[1].toss, null);
+  });
+
+  test('1e. 2º jogo sem permanência e sem PRO e RE completos: quem entrou primeiro fica (sem par ou ímpar)', () => {
+    let s = mkSession([5, 5, 5, 3]);
+    s.games.push({ n: 1 }); // simula que o 1º jogo já aconteceu e ninguém tem permanência
+    const an = analyzeResult(s, 'draw');
+    assert.equal(an.scenario, 'DRAW_ENTRY_ORDER');
+    assert.ok(!an.needsToss);
+    assert.deepEqual(an.staying, ['t1']);
+    s = R(s, 'draw');
+    assert.deepEqual(s.field, ['t1', 't3']);
+    assert.ok(perm(s, 't1'), 'quem fica passa a defender a permanência');
+    assert.ok(!s.teams.t2, 't2 saiu e completou a fila (divisão)');
+    assert.equal(s.teams.t1.stats.drawPermanences, 1);
+  });
+
+  test('1f. Defensor x desafiante com PRO e RE completos: saem os dois e o desafiante sobe primeiro', () => {
+    let s = mkSession([5, 5, 5, 5, 5]);
+    s = R(s, 'B'); // t2 vence t1; t3 entra no slot A
+    assert.deepEqual(s.field, ['t3', 't2']);
+    s = R(s, 'draw');
+    assert.deepEqual(s.field, ['t4', 't5']);
+    assert.deepEqual(s.queue.slice(-2), ['t3', 't2'], 'desafiante (t3) na frente do defensor (t2)');
+    assert.equal(s.games[1].toss, null, 'sem par ou ímpar');
   });
 
   test('2. Vencedor x desafiante sem permanência: desafiante empata e permanece', () => {
@@ -145,9 +196,9 @@ suite('Empates — seção 22', () => {
     assert.deepEqual(an.leaving, ['t3', 't1']);
   });
 
-  test('10. Ordem da fila após empate (saída dupla sem permanência mantém ordem de campo)', () => {
+  test('10. Ordem da fila após saída dupla no 1º jogo segue o par ou ímpar', () => {
     let s = mkSession([5, 5, 5, 5, 5, 5]);
-    s = R(s, 'draw'); // primeiro jogo, PRO/RE completos → saída dupla
+    s = R(s, 'draw', { tossWinner: 't1' }); // primeiro jogo, PRO/RE completos → saída dupla com par ou ímpar
     assert.deepEqual(s.field, ['t3', 't4']);
     assert.deepEqual(s.queue, ['t5', 't6', 't1', 't2']);
     assert.deepEqual(['t5', 't6', 't1', 't2'].map((id) => queueLabel(s, id)), ['PRO', 'RE', 'TRI', '4º']);
@@ -232,7 +283,7 @@ suite('Rodízio e divisão — seção 14', () => {
     const t1 = byPos(s, 't1');
     const t2 = byPos(s, 't2');
     const t5 = byPos(s, 't5');
-    s = R(s, 'draw'); // PRO e RE completos → saem t1 e t2, nessa ordem
+    s = R(s, 'draw', { tossWinner: 't1' }); // 1º jogo, PRO e RE completos → saem t1 e t2, nessa ordem
     // t1 completa o t5 (vagas 3–5) com suas posições 1–3; restante (pos. 4–5) forma t6
     assert.deepEqual(byPos(s, 't5'), [t5[0], t5[1], t1[0], t1[1], t1[2]]);
     // t2 completa o t6 (vagas 3–5) com suas posições 1–3; restante (pos. 4–5) forma t7

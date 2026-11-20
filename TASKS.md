@@ -22,7 +22,7 @@ técnicos, no [CLAUDE.md](CLAUDE.md).
 - [x] Teste de isolamento: o domínio não usa DOM/navegador/armazenamento e a interface só o acessa por `index.js`.
 - [x] Servidor local em PowerShell (`tools/serve.ps1`) e geração de ícones (`tools/make-icons.ps1`).
 - [x] Documentação: README.md, PRD.md (137 regras), CLAUDE.md, TASKS.md.
-- [x] 168 testes automatizados passando (navegador e Node).
+- [x] 171 testes automatizados passando (navegador e Node).
 - [x] Goleiros fora do sorteio; seção "Ordem de chegada dos goleiros" no topo da presença (aviso se sortear sem goleiro); um goleiro por
       time (campo e fila); perdedor leva o goleiro ao 1º time sem goleiro (RN-134 a RN-137, 2026-11-20).
 - [ ] Usar numa pelada real e revisar com o dono (5 times × 3 goleiros, atrasado, lesão, mais goleiros que times).
@@ -74,7 +74,7 @@ técnicos, no [CLAUDE.md](CLAUDE.md).
 - [x] Rodízio com vitória, divisão/recomposição da equipe em formação de baixo para cima.
 - [x] Permanência separada de vitórias oficiais; saída dupla com PRO e RE completos; par ou ímpar;
       direito ao empate do desafiante — os 12 cenários exigidos testados.
-- [x] Conflito "par ou ímpar no 1º jogo × saída dupla" resolvido, com opção em Ajustes.
+- [x] Par ou ímpar obrigatório e automático só no 1º jogo (com saída dupla, decide a ordem na fila); do 2º jogo em diante, sem par ou ímpar e com preferência do desafiante (RN-56, RN-138). Opção de Ajustes removida.
 - [x] Atrasados por ordem de chegada, aviso de desequilíbrio sem reorganizar.
 - [x] Retirada (lesão, saída, desistência, outro) com reposição automática em cascata pela fila (RN-76 a RN-78).
 - [x] Simulação e aplicação de transferência.

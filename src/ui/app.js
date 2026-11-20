@@ -145,7 +145,7 @@ const FREE_ACTIONS = new Set([
 ]);
 
 /** Ajustes e seleção de presentes (campos de formulário) também são do administrador. */
-const ADMIN_FIELDS = new Set(['stitle', 'ssched', 'set-group', 'set-tol', 'set-n', 'set-toss', 'import', 'pix-qr']);
+const ADMIN_FIELDS = new Set(['stitle', 'ssched', 'set-group', 'set-tol', 'set-n', 'import', 'pix-qr']);
 
 // ------------------------------------------------------------------ financeiro (RN-118 a RN-127)
 
@@ -986,12 +986,6 @@ document.addEventListener('change', async (ev) => {
       st.linePerTeam = clampLinePerTeam(el.value);
       setup.config.linePerTeam = st.linePerTeam;
       break;
-    case 'set-toss': {
-      st.tossOnFirstGameEvenWithTwoWaiting = el.checked;
-      const s = activeSession();
-      if (s && s.games.length === 0) s.config.tossOnFirstGameEvenWithTwoWaiting = el.checked;
-      break;
-    }
     case 'share-opt': {
       const m = app.ui.modal;
       m.opts[el.dataset.k] = el.checked;

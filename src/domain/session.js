@@ -15,7 +15,6 @@ export const DEFAULT_CONFIG = {
   linePerTeam: 5,
   useGoalkeepers: true,
   requireGkForComplete: false,
-  tossOnFirstGameEvenWithTwoWaiting: false,
   toleranceMin: 10,
 };
 

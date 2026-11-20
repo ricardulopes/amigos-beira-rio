@@ -18,9 +18,17 @@ export function registerResult(state, result, opts = {}) {
     const [a, b] = s.field;
     if (an.needsToss) {
       if (!opts.tossWinner || ![a, b].includes(opts.tossWinner)) throw new RuleError('Informe quem venceu o par ou ímpar.');
-      staying = [opts.tossWinner];
-      leaving = [opts.tossWinner === a ? b : a];
-      explanation += ` ${label(s, staying[0])} venceu o par ou ímpar e permanece; ${label(s, leaving[0])} sai.`;
+      const loser = opts.tossWinner === a ? b : a;
+      if (an.scenario === SCENARIOS.DRAW_TOSS_DOUBLE_EXIT) {
+        // RN-56: saem os dois; o vencedor do par ou ímpar ganha a preferência na fila.
+        staying = [];
+        leaving = [opts.tossWinner, loser];
+        explanation += ` ${label(s, opts.tossWinner)} venceu o par ou ímpar e volta à fila na frente de ${label(s, loser)}.`;
+      } else {
+        staying = [opts.tossWinner];
+        leaving = [loser];
+        explanation += ` ${label(s, staying[0])} venceu o par ou ímpar e permanece; ${label(s, leaving[0])} sai.`;
+      }
     }
     const game = {
       n: s.games.length + 1,
@@ -51,7 +59,9 @@ export function registerResult(state, result, opts = {}) {
       const w = s.teams[staying[0]];
       w.stats.tossWins++;
       w.permanence = true;
-    } else if (an.scenario === SCENARIOS.DRAW_CHALLENGER_STAYS) {
+    } else if (an.scenario === SCENARIOS.DRAW_TOSS_DOUBLE_EXIT) {
+      s.teams[opts.tossWinner].stats.tossWins++;
+    } else if (an.scenario === SCENARIOS.DRAW_CHALLENGER_STAYS || an.scenario === SCENARIOS.DRAW_ENTRY_ORDER) {
       const c = s.teams[staying[0]];
       c.stats.drawPermanences++;
       c.permanence = true;

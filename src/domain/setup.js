@@ -125,7 +125,6 @@ export function prepareDraw({ players, selectedIds, config, settings = {}, seed,
     requireGkForComplete: false,
     linePerTeam: clampLinePerTeam(config.linePerTeam),
     toleranceMin: clampTolerance(settings.toleranceMin ?? DEFAULT_TOLERANCE_MIN),
-    tossOnFirstGameEvenWithTwoWaiting: !!settings.tossOnFirstGameEvenWithTwoWaiting,
   };
   const snapshots = Object.fromEntries(plan.chosen.map((p) => [p.id, snapshotPlayer(p)]));
   // RN-134: o sorteio é estritamente de linha; goleiros nunca entram nele.

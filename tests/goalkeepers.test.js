@@ -74,7 +74,7 @@ suite('Goleiros — rodízio e atrasado (exemplo do dono: 5 times, 3 goleiros) (
 
   test('Empate com saída dupla: os goleiros soltos vão para os primeiros times sem goleiro (campo, depois fila)', () => {
     let s = mkSession([5, 5, 5, 5], { goalkeepers: 3 });
-    s = registerResult(s, 'draw').state; // 1º jogo com PRO e RE completos: saem os dois
+    s = registerResult(s, 'draw', { tossWinner: 't1' }).state; // 1º jogo com PRO e RE completos: saem os dois
     assert.deepEqual(s.field, ['t3', 't4']);
     assert.deepEqual(gkMap(s, ['t3', 't4', 't1', 't2']), ['G3', 'G1', 'G2', null]);
   });

@@ -171,9 +171,13 @@ pilha de desfazer.
 
 | Situação no momento do resultado | Empate |
 |---|---|
-| PRO **e** RE completos | Saem os dois (sempre). PRO e RE entram. Na fila: desafiante sem permanência antes do defensor. |
-| Só um completo aguardando (ou nenhum), um time defende permanência | Desafiante sem permanência fica (conta como vitória para a regra); defensor sai. |
-| Ninguém em campo tem permanência (1º jogo, ou após saída dupla) | Par ou ímpar; vencedor fica com permanência. |
+| **1º jogo**, PRO ou RE incompleto | **Par ou ímpar** (sempre no 1º jogo): o vencedor fica com permanência; o perdedor sai. |
+| **1º jogo**, PRO **e** RE completos | **Par ou ímpar**: saem os dois, PRO e RE entram; o vencedor do par ou ímpar volta à fila na frente do perdedor. |
+| 2º jogo em diante, PRO **e** RE completos | Saem os dois (sempre). Na fila: desafiante antes do defensor; se ninguém tinha permanência (ex.: Time 3 x Time 4), na ordem em que entraram. |
+| 2º jogo em diante, um time defende permanência | Desafiante (quem entrou de fora) fica e passa a defender; quem defendia sai. |
+| 2º jogo em diante, ninguém com permanência e sem PRO e RE completos (raro) | Quem entrou primeiro fica; o outro sai. |
+
+Do 2º jogo em diante **não existe par ou ímpar**. Essas regras são automáticas (não há opção em Ajustes).
 
 - Vitória: vencedor fica com permanência; perdedor vai ao fim da fila; PRO entra sem permanência.
 - Quem sai de campo perde a permanência. Estatísticas separadas: vitórias oficiais, empates,
@@ -187,11 +191,6 @@ pilha de desfazer.
   para o Time 4. Empate segue a regra dos times. Todo card (campo e fila) mostra o goleiro do time ou
   "aguardando goleiro"; 🧤 Goleiros troca goleiros de time (▲ ▼ ⤓).
 
-### Conflito resolvido
-"Par ou ímpar no primeiro jogo" × "PRO e RE completos: saem os dois, regra absoluta". Como a seção 18
-declara prioridade, **por padrão a saída dupla prevalece**; o par ou ímpar vale quando há no máximo um
-completo aguardando. Para quem prefere o contrário há a opção em **Ajustes → Par ou ímpar no 1º jogo
-mesmo com PRO e RE completos**.
 
 ### Outras decisões
 - Atrasado de linha entra na base da última equipe da fila se houver vaga; senão abre nova equipe.

@@ -656,8 +656,6 @@ export function settingsView() {
         <label class="field"><span>Tolerância (min)</span><input type="number" min="0" max="120" inputmode="numeric" data-change="set-tol" value="${st.toleranceMin}"></label>
         <label class="field"><span>Linha por time</span><input type="number" min="${LIMITS.linePerTeam.min}" max="${LIMITS.linePerTeam.max}" inputmode="numeric" data-change="set-n" value="${st.linePerTeam}"></label>
       </div>
-      <label class="switch"><input type="checkbox" data-change="set-toss" ${st.tossOnFirstGameEvenWithTwoWaiting ? 'checked' : ''}><span>Par ou ímpar no 1º jogo mesmo com PRO e RE completos</span></label>
-      <p class="muted small">Por padrão, a regra de saída dupla (PRO e RE completos) prevalece sobre o par ou ímpar do primeiro jogo.</p>
     </section>
     <section class="card">
       <h3>Banco na nuvem</h3>

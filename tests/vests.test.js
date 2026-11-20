@@ -38,8 +38,8 @@ suite('Coletes Amarelo/Azul', () => {
 
   test('RN-110: empate com saída dupla — 1º que sobe veste Amarelo, 2º veste Azul', () => {
     const s0 = mkSession([5, 5, 5, 5]);
-    assert.equal(analyzeResult(s0, 'draw').scenario, 'DRAW_DOUBLE_EXIT');
-    const s = R(s0, 'draw');
+    assert.equal(analyzeResult(s0, 'draw').scenario, 'DRAW_TOSS_DOUBLE_EXIT');
+    const s = R(s0, 'draw', { tossWinner: 't2' });
     assert.deepEqual(s.field, ['t3', 't4']);
     assert.deepEqual(vests(s), { t3: 'yellow', t4: 'blue' });
   });

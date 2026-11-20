@@ -338,22 +338,32 @@ do Time 4; as posições 4 e 5 do Time 2 formam o Time 5 (como posições 1 e 2)
 ### 9.2 Decisão do empate (avaliada nesta ordem)
 
 Definições no momento do empate: **PRO completo**, **RE completo** (RN-59) e "permanência em campo".
+Tudo é automático; não há opção em Ajustes (revisado em 2026-11-20 a pedido do dono).
 
-- **RN-54 — Cenário A/D (saída dupla).** Se **PRO e RE estão completos**: os **dois** times em campo
-  saem, **sempre**, não importa quantas vitórias, permanência, se acabou de ficar por empate ou quem
-  era desafiante. Essa regra é absoluta.
-- **RN-55** Na saída dupla, a ordem de volta à fila é: **desafiante sem permanência primeiro**, depois o
-  defensor (prioridade do desafiante). Se nenhum tinha permanência, mantém a ordem dos slots (A, depois B).
-  O PRO entra no slot A e o RE no slot B. Ambos saem sem permanência.
-- **RN-56 — Regra do par ou ímpar.** Se não é saída dupla e **nenhuma** equipe em campo tem permanência
-  (primeiro jogo, ou logo após uma saída dupla): o app pede o par ou ímpar. O vencedor fica, no mesmo
-  slot, e ganha permanência; o perdedor vai para o fim da fila. O resultado registrado é "empate".
-- **RN-57 — Cenários B/C (direito ao empate).** Se não é saída dupla e uma equipe defende permanência
-  (ou seja, há no máximo um completo entre PRO e RE): o **desafiante sem permanência fica** em campo e
-  passa a defender permanência (permanências por empate +1); o defensor perde a permanência e vai para
-  o fim da fila; o PRO entra.
+- **RN-56 — 1º jogo: par ou ímpar obrigatório.** Se a **primeira partida** da pelada (Time 1 x Time 2)
+  empatar, **sempre** há par ou ímpar, haja ou não times completos na fila:
+  - **Cenário A — PRO ou RE incompleto (ou ausente):** o vencedor do par ou ímpar fica, no mesmo slot, e
+    ganha permanência; o perdedor vai para o fim da fila.
+  - **Cenário B — PRO e RE completos:** os dois times em campo saem e entram PRO (slot A) e RE (slot B).
+    O vencedor do par ou ímpar tem a **preferência na fila**: volta antes do perdedor. Ninguém fica com
+    permanência. O resultado registrado é "empate" (vitória no par ou ímpar entra nas estatísticas).
+- **RN-138 — Do 2º jogo em diante não existe par ou ímpar**, em hipótese alguma. As regras abaixo valem a
+  partir do 2º jogo.
+- **RN-54 — Saída dupla.** Se **PRO e RE estão completos**: os **dois** times em campo saem, **sempre**,
+  não importa quantas vitórias, permanência, se acabou de ficar por empate ou quem era desafiante.
+- **RN-55** Ordem de volta à fila na saída dupla: **desafiante sem permanência primeiro**, depois o defensor
+  (preferência do desafiante). Se nenhum tinha permanência (times que entraram juntos, ex.: Time 3 x Time 4
+  após a saída dupla do 1º jogo), voltam **na ordem em que entraram** (slot A, que entrou primeiro, depois
+  slot B). O PRO entra no slot A e o RE no slot B. Ambos saem sem permanência.
+- **RN-57 — Direito ao empate do desafiante.** Se não é saída dupla e uma equipe defende permanência: o
+  **desafiante sem permanência fica** em campo e passa a defender permanência (permanências por empate +1);
+  o defensor perde a permanência e vai para o fim da fila; o PRO entra.
 - **RN-58** O direito ao empate não é imunidade: no jogo seguinte, quem ficou por empate é o defensor
   e precisa vencer. Se empatar de novo (sem saída dupla), o novo desafiante é que fica.
+- **RN-138a** *(decisão do dono, 2026-11-20)* Caso raro: do 2º jogo em diante, empate entre dois times **sem**
+  permanência e **sem** PRO e RE completos (ex.: após uma saída dupla, divisão ou lesão deixou a fila com
+  time incompleto): sem par ou ímpar, **fica quem entrou primeiro** (slot A), que ganha permanência
+  (permanências por empate +1); o outro vai para o fim da fila.
 
 ### 9.3 Completude da fila
 
@@ -363,21 +373,19 @@ Definições no momento do empate: **PRO completo**, **RE completo** (RN-59) e "
 - **RN-60** *(só peladas antigas; nas novas vale RN-134 a RN-137)* Com a opção "equipe só é completa com goleiro", uma equipe com N de linha mas sem goleiro
   é incompleta para essas regras.
 
-### 9.4 Conflito resolvido: primeiro jogo × saída dupla
+### 9.4 Conflito primeiro jogo × saída dupla — SUBSTITUÍDO
 
-O pedido original diz que empate no primeiro jogo vai para par ou ímpar **e** que a saída dupla com PRO
-e RE completos é absoluta e tem prioridade. Decisão:
-
-- **RN-61** Por padrão, a **saída dupla prevalece** (a seção de empates declara prioridade). O par ou
-  ímpar vale no primeiro jogo quando há no máximo um completo entre PRO e RE.
-- **RN-62** Configuração opcional (Ajustes): "Par ou ímpar no 1º jogo mesmo com PRO e RE completos".
-  Vale só para o primeiro jogo e só se ninguém tiver permanência.
+- **RN-61** e **RN-62** *(substituídas em 2026-11-20 por RN-56)*: antes a saída dupla prevalecia no 1º jogo e
+  havia a opção "Par ou ímpar no 1º jogo mesmo com PRO e RE completos" em Ajustes. O dono decidiu que o
+  par ou ímpar do 1º jogo é obrigatório e automático: com PRO e RE completos os dois saem e o par ou ímpar
+  decide a ordem na fila. A opção foi removida (peladas antigas que tinham a opção gravada a ignoram).
 
 ### 9.5 Interface do resultado
 
 - **RN-63** Três botões sempre visíveis no topo da tela da partida: Vitória do time A, Empate, Vitória do time B.
 - **RN-64** Antes de confirmar, o app mostra a explicação do que vai acontecer e, no empate, a checagem:
-  é o primeiro jogo? quantos completos aguardam (PRO/RE)? quem defende permanência?
+  é o primeiro jogo? quantos completos aguardam (PRO/RE)? quem defende permanência? O vencedor do par ou
+  ímpar só é pedido no empate do 1º jogo (RN-56).
 - **RN-65** Depois de confirmar, mostra "Último resultado" com a explicação e todas as movimentações
   (divisões, novas equipes). A tela também indica, antes do jogo, o que acontece se empatar.
 - **RN-66** Ajuste manual de permanência existe apenas para correção de registro ("Mais opções").
@@ -386,9 +394,11 @@ e RE completos é absoluta e tem prioridade. Decisão:
 
 | Situação no momento do empate | Resultado |
 |---|---|
-| PRO e RE completos | Saem os dois. PRO e RE entram. Fila: desafiante, depois defensor. |
-| Ninguém com permanência, ≤ 1 completo | Par ou ímpar. Vencedor fica com permanência. |
-| Alguém defende permanência, ≤ 1 completo | Desafiante fica e ganha permanência; defensor sai. |
+| 1º jogo, PRO ou RE incompleto | Par ou ímpar. Vencedor fica com permanência; perdedor sai. |
+| 1º jogo, PRO e RE completos | Par ou ímpar. Saem os dois; PRO e RE entram; vencedor do par ou ímpar volta antes à fila. |
+| 2º jogo em diante, PRO e RE completos | Saem os dois. Fila: desafiante antes do defensor; sem permanência, na ordem em que entraram. |
+| 2º jogo em diante, alguém defende permanência | Desafiante fica e ganha permanência; defensor sai. |
+| 2º jogo em diante, ninguém com permanência (raro) | Quem entrou primeiro fica e ganha permanência; o outro sai. |
 
 ### 9.7 Coletes dupla-face Amarelo/Azul (`src/domain/vests.js`)
 
@@ -532,8 +542,8 @@ completam o 5º time; os dois seguintes abrem o 6º; o quinto atrasado entra no 
 - **RN-96** "Limpar dados deste aparelho" com confirmação: apaga só a cópia local (e o acesso de admin
   do aparelho) e baixa tudo de novo da nuvem. Nada é apagado para os outros. Avisa se houver alterações
   ainda não enviadas. Importar backup (RN-95) substitui os dados na nuvem, para todos (só admin).
-- **RN-97** Configurações padrão em Ajustes: nome do grupo, tolerância, N, goleiros, goleiro obrigatório,
-  par ou ímpar no 1º jogo.
+- **RN-97** Configurações padrão em Ajustes: nome do grupo, tolerância e N (goleiros e par ou ímpar são automáticos,
+  RN-134 e RN-56).
 
 ### 16.1 Modo administrador por PIN no aparelho — SUBSTITUÍDO (histórico)
 
@@ -707,7 +717,7 @@ Proteções da auditoria de ponto cego (pedido do dono em 2026-11-20):
 
 ---
 
-## 18. Testes automatizados (cobertura atual: 168 testes)
+## 18. Testes automatizados (cobertura atual: 171 testes)
 
 Executar em `tests/index.html` (navegador) ou `node tests/run-node.mjs`.
 
