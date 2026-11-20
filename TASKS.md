@@ -37,7 +37,7 @@ técnicos, no [CLAUDE.md](CLAUDE.md).
 - [x] Zerar lançamentos de teste (Ajustes → Financeiro e Pix) para iniciar o ciclo oficial.
 - [x] Ciclos manuais (RN-128): encerrar/iniciar semestre no painel admin, folga conta no próximo ciclo,
       cashback zera só quando o admin manda, ciclos encerrados consultáveis no ranking.
-- [x] Estrelas maiores (altura das etiquetas DEF/MEI/ATA) e meia estrela com a parte vazia em cinza.
+- [x] Estrelas maiores (altura das etiquetas DEF/MEI/ATA) e meia estrela com a parte vazia em preto (#000).
 - [ ] Usar nas próximas peladas e revisar com o dono: crédito do R$ 3 só com pagamento? desempate na linha de corte?
 - [ ] 🔶 Importar o saldo da planilha (15/11/2026) — adiado pelo dono; conciliação de nomes já levantada.
 

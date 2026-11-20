@@ -23,7 +23,7 @@
   --ok: var(--abr-blue);
   --star: var(--abr-yellow);
   --star-edge: #9C7A00;
-  --star-empty: #CBD5E1; /* parte vazia da meia estrela: cinza neutro, bem diferente do amarelo */
+  --star-empty: #000000; /* parte vazia da meia estrela: preto puro, contraste máximo com o amarelo */
   --vest-yellow: var(--abr-yellow);
   --vest-blue: var(--abr-blue);
   --vest-edge: #001A4D;
@@ -52,7 +52,7 @@
     --warn-bg: #3A2D10;
     --info-bg: #13244A;
     --star-edge: #00000000;
-    --star-empty: #4B5568;
+    --star-empty: #000000;
     --vest-edge: #B9C6E6;
     --D: #5B9BFF;
     --M: #34C77B;
