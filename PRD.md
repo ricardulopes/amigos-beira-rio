@@ -576,14 +576,15 @@ Pix e modo teste ficam nos ajustes do grupo (`app_state.settings.finance`), grav
   Sorteio não iniciado (rascunho) não conta. O tipo da presença (linha ou goleiro) é o daquela pelada: o mesmo
   atleta pode ter histórico como linha e como goleiro. "Jogos realizados" = peladas iniciadas no período.
 - **RN-119 — Taxa e pagamento do dia.** Linha paga **R$ 18** por pelada (R$ 15 operacional + R$ 3 retidos para o
-  cashback). Goleiro é **isento** (não aceita Pix/Cartão; aparece como "Isento (goleiro)"). O admin marca,
-  por pelada, **Pix**, **Cartão** (maquininha) ou **Isento**; sem marcação = pendente. Tocar de novo na forma
+  cashback). Goleiro é **isento** (não aceita Pix/Cartão/Dinheiro; aparece como "Isento (goleiro)"). O admin marca,
+  por pelada, **Pix**, **Cartão** (maquininha), **Dinheiro** (incluído em 2026-11-20) ou **Isento**; sem marcação = pendente. Tocar de novo na forma
   marcada volta a pendente. O pagamento não é movimentação de jogo: não vai para o desfazer e desfazer um
   resultado não apaga pagamentos.
-- **RN-120 — Cashback.** Cada presença como linha soma **R$ 3** ao cashback do período do atleta (RN-128). Goleiros (e quem
-  quiser) acumulam por **aportes livres** lançados pelo admin (ex.: R$ 30, R$ 50). *Decisão:* o crédito de R$ 3
-  vem da presença confirmada (pelada iniciada), mesmo com o pagamento pendente; a pendência aparece no extrato e
-  no caixa do dia para cobrança. Se o dono quiser creditar só depois do pagamento, muda-se aqui.
+- **RN-120 — Cashback.** Cada presença como linha **paga** (Pix, Cartão ou Dinheiro) soma **R$ 3** ao cashback do
+  período do atleta (RN-128). Goleiros (e quem quiser) acumulam por **aportes livres** lançados pelo admin (ex.: R$ 30,
+  R$ 50). *Decisão do dono (2026-11-20, substitui a anterior):* pagamento **pendente** ou marcado **Isento** não gera
+  cashback; o crédito aparece assim que o pagamento é marcado. Assim o cashback prometido no extrato é igual ao que o
+  caixa reteve (R$ 3 de cada pagante). O extrato mostra quantas presenças ficaram sem cashback por falta de pagamento.
 - **RN-121 — Semestres (substituída por RN-128 em 2026-11-19).** Antes o ranking virava sozinho em 1º de
   janeiro/1º de julho e o cashback no fim do ano. Agora o semestre é um **ciclo manual** (RN-128); o calendário
   só serve para sugerir o nome do ciclo ("1º semestre de 2027").
@@ -596,8 +597,9 @@ Pix e modo teste ficam nos ajustes do grupo (`app_state.settings.finance`), grav
   inicia um ciclo marcando "Zerar (novo ano da festa)"** (RN-128) — não zera mais sozinho na virada do ano.
 - **RN-124 — Extrato (livre para todos).** O atleta escolhe o próprio nome (lembrado no aparelho) e vê jogos do
   ciclo aberto (na folga, do ciclo encerrado), com %, cashback do período (presenças × R$ 3 + aportes), quanto
-  falta para a festa, pendências de pagamento, os lançamentos do período, o cashback do período anterior (para o
-  acerto da festa depois de zerar) e quantos lançamentos da folga vão para o próximo ciclo.
+  falta para a festa, pendências de pagamento, os lançamentos do período, o cashback de **todos** os períodos
+  anteriores (RN-131) e quantos lançamentos da folga vão para o próximo ciclo. A lista de nomes inclui quem saiu do
+  cadastro mas tem presenças, aportes ou acertos (marcado "fora do cadastro"), para o dinheiro continuar conferível.
 - **RN-125 — Pix da tesouraria.** O admin configura chave Pix, nome do recebedor, código "Copia e Cola"
   (começa com `000201`) e a imagem do QR Code (reduzida no aparelho para até 480 px). Todos veem e copiam
   em Caixa → Pix e no atalho 💠 da tela inicial.
@@ -621,7 +623,36 @@ Pix e modo teste ficam nos ajustes do grupo (`app_state.settings.finance`), grav
   - *Decisão do dono:* o cashback **zera só quando o admin mandar**: ao iniciar o ciclo, escolhe "Continua
     acumulando" (ex.: do 1º para o 2º semestre) ou "Zerar (novo ano da festa)".
   - Sem nenhum ciclo cadastrado existe um ciclo aberto implícito desde o início do ciclo oficial. Os ciclos ficam
-    em `settings.finance.cycles` (`{ id, label, start, end, resetCashback }`), sem mudança no banco.
+    em `settings.finance.cycles` (`{ id, label, start, end, resetCashback, frozen? }`).
+
+Proteções da auditoria de ponto cego (pedido do dono em 2026-11-20):
+
+- **RN-129 — Ciclo encerrado blindado.** Ao encerrar, o app guarda o ranking do ciclo (linha e gol: total de jogos e
+  presenças de cada atleta, em `frozen`). Em ciclo encerrado o ranking exibido é o guardado ("🔒 Ranking guardado
+  no encerramento") e não muda mais. Pelada de ciclo encerrado **não pode ser excluída** do histórico (é preciso
+  reabrir o ciclo, RN-130). Mudar um pagamento de pelada de ciclo encerrado é permitido (pagamento atrasado), mas
+  pede confirmação, porque muda o cashback daquele período (o ranking guardado não muda). Rascunhos e peladas da
+  folga não são bloqueados.
+- **RN-130 — Reabrir o último ciclo encerrado.** Para corrigir um encerramento feito por engano (PIN mestre +
+  digitar REABRIR). Na folga, o último ciclo encerrado volta a ficar aberto; o ranking guardado é descartado e as
+  peladas/aportes da folga voltam a contar nele. Se um ciclo novo já foi iniciado, ele só pode ser desfeito
+  enquanto estiver **vazio** (nenhuma pelada nem aporte depois do início dele); senão o app recusa.
+- **RN-131 — Períodos anteriores e acerto da festa.** O extrato lista o cashback de todos os períodos já zerados
+  (mais recente primeiro). O admin pode **registrar o acerto da festa** de cada atleta em cada período (data,
+  valor do cashback na hora, observação) e desfazer o registro; o acerto é só um registro para a tesouraria, não
+  altera o cashback. Fica em `settings.finance.partySettlements`.
+- **RN-132 — Zerar mais seguro.** O reset (RN-127) recusa se houver pelada em andamento **ou sorteio em
+  rascunho**. No ciclo oficial o botão vira "⚠️ Apagar todo o histórico (recomeçar do zero)" e a palavra exigida
+  passa de ZERAR para **APAGAR TUDO**, com aviso de que o histórico real será apagado. A conferência da palavra é
+  feita no domínio (`resetCycle`).
+- **RN-133 — Dois admins ao mesmo tempo nas configurações.** Aportes, ciclos, acertos, Pix e seleção ficam num
+  registro único na nuvem. Para um admin que ficou sem sinal não apagar o que outro gravou, o aparelho guarda a
+  versão em que se baseou e, ao enviar, lê a nuvem e **mescla em três vias**: aportes/acertos/ciclos item a item
+  (o que cada um incluiu fica, o que um excluiu sai), demais campos pelo lado que mudou; conflito real no mesmo
+  campo fica com quem está enviando. A gravação usa `admin_save_app_state_v2`, que só grava se a versão da nuvem
+  não mudou no meio (senão o app lê e mescla de novo). Enquanto o `schema.sql` novo não for rodado no Supabase, o
+  app mescla do mesmo jeito e grava pela função antiga. Pagamentos e resultados de jogo continuam com o controle
+  por pelada (RN-115).
 
 ---
 
@@ -642,7 +673,7 @@ Pix e modo teste ficam nos ajustes do grupo (`app_state.settings.finance`), grav
 
 ---
 
-## 18. Testes automatizados (cobertura atual: 144 testes)
+## 18. Testes automatizados (cobertura atual: 153 testes)
 
 Executar em `tests/index.html` (navegador) ou `node tests/run-node.mjs`.
 
@@ -655,7 +686,7 @@ Executar em `tests/index.html` (navegador) ou `node tests/run-node.mjs`.
 | `tests/cloud.test.js` | Visitante não grava (mudança sem admin é recusada e não entra na fila); banco unificado: diferenças entre versões, fila offline (sem duplicar, versão-base da primeira mudança, exclusões), pelada nova, mescla com a nuvem com e sem pendências, conversão de linhas |
 | `tests/admin.test.js` | Formato do PIN mestre, visitante só vê/compartilha/exporta × PIN mestre para qualquer alteração, sem código do jogador, acesso de 12 h; lista oficial embutida; leitura da lista em lote (formatos, "Felipe 2", erros), mesclar, X, jogador novo incompleto, ida e volta, substituir |
 | `tests/vests.test.js` | Coletes Amarelo/Azul: abertura, vitória de cada cor, sequência de vitórias, empate com saída dupla, empate com um só saindo, indicador neutro da PRO, prévia e explicação, WhatsApp, integridade (cores diferentes), migração de peladas antigas |
-| `tests/finance.test.js` | Financeiro (RN-118 a RN-128): dinheiro em centavos, R$ 18 = 15 + 3, presença só em pelada iniciada e com o tipo do snapshot, ciclos manuais (encerrar/iniciar, folga conta no próximo, ciclo encerrado consultável), rankings com Top 32/Top 4 e empate no corte, cashback que só zera quando o admin manda e período anterior no extrato, aportes, festa quitada, extrato, pagamento puro (goleiro isento), resumo do caixa, Pix/QR validados, reset |
+| `tests/finance.test.js` | Financeiro (RN-118 a RN-132): cashback só com pelada paga (Pix/Cartão/Dinheiro), ranking guardado no encerramento e exclusão bloqueada, reabrir ciclo, períodos anteriores e acerto da festa, atleta excluído com aportes, zerar com rascunho/palavra forte no oficial; dinheiro em centavos, R$ 18 = 15 + 3, presença só em pelada iniciada e com o tipo do snapshot, ciclos manuais (encerrar/iniciar, folga conta no próximo, ciclo encerrado consultável), rankings com Top 32/Top 4 e empate no corte, cashback que só zera quando o admin manda e período anterior no extrato, aportes, festa quitada, extrato, pagamento puro (goleiro isento), resumo do caixa, Pix/QR validados, reset |
 | `tests/isolation.test.js` | Visitante só lê: ações livres do app só de leitura/navegação, todo campo que altera dados exige PIN, nenhuma função do banco liberada sem ser de admin; o domínio não usa DOM/navegador/armazenamento, só importa a si mesmo, e interface/persistência/nuvem só o acessam por `src/domain/index.js`; nenhuma chave secreta do Supabase no app |
 
 **Não coberto por teste automatizado:** a execução do SQL e a conversa real com o Supabase. Conferido

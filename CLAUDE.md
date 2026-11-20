@@ -63,7 +63,9 @@ src/domain/    REGRAS DE NEGÓCIO PURAS. Sem DOM, sem navegador, sem armazenamen
   admin.js       permissões: visitante só lê × PIN mestre para qualquer alteração, formato do PIN
   roster.js      importação da base em lote: leitura da lista, plano (criar/atualizar/excluir), aplicação
   finance.js     presenças, pagamento do dia (session.payments), cashback, aportes/Pix/modo teste
-                 (settings.finance), ciclos manuais e rankings por ciclo (Top 32/Top 4), extrato, reset (RN-118 a RN-128)
+                 (settings.finance), ciclos manuais e rankings por ciclo (Top 32/Top 4), extrato, reset (RN-118 a RN-128);
+                 proteções: ranking guardado, reabrir ciclo, acerto da festa, zerar seguro (RN-129 a RN-132)
+src/cloud/diff.js  mescla em três vias das configurações entre admins (RN-133, `mergeAppState`)
 src/storage/   persistência (storage.js): esquema, pilha de desfazer, exportar/importar backup
 src/ui/        APRESENTAÇÃO E ORQUESTRAÇÃO
   state.js       estado da UI, save(), sessão ativa, modal, toast, navegação
@@ -153,7 +155,7 @@ tests/         harness próprio + suítes (*.test.js) + runner de navegador e de
 ## Testes (obrigatório)
 
 - Toda mudança em regra de negócio exige teste novo ou atualizado em `tests/` **antes** de considerar
-  pronto, e toda a suíte precisa passar (hoje: 144 testes). Testes do domínio importam de
+  pronto, e toda a suíte precisa passar (hoje: 153 testes). Testes do domínio importam de
   `../src/domain/index.js`, nunca da interface.
 - Regras de empate/rodízio: testar o **estado interno** (field, queue, permanence, stats, composição
   das equipes), não só textos. Valores em dinheiro: sempre centavos inteiros (`formatMoney`/`parseMoney`). Use `mkSession(sizes, {gks, config, stars})` de `tests/helpers.js` para

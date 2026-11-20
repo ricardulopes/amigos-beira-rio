@@ -21,8 +21,8 @@ técnicos, no [CLAUDE.md](CLAUDE.md).
       atrasados, retiradas, ajustes, avisos, estatísticas, compartilhamento) com API única em `index.js`.
 - [x] Teste de isolamento: o domínio não usa DOM/navegador/armazenamento e a interface só o acessa por `index.js`.
 - [x] Servidor local em PowerShell (`tools/serve.ps1`) e geração de ícones (`tools/make-icons.ps1`).
-- [x] Documentação: README.md, PRD.md (128 regras), CLAUDE.md, TASKS.md.
-- [x] 144 testes automatizados passando (navegador e Node).
+- [x] Documentação: README.md, PRD.md (133 regras), CLAUDE.md, TASKS.md.
+- [x] 153 testes automatizados passando (navegador e Node).
 - [x] Banco unificado no Supabase com PIN mestre, fila offline e Realtime (RN-113 a RN-117).
 - [x] Visitante só lê; toda alteração exige o PIN mestre; código do jogador removido (RN-116, 2026-11-19).
 - [x] Rodar `supabase/schema.sql` no Supabase e definir o PIN mestre (dono).
@@ -38,7 +38,11 @@ técnicos, no [CLAUDE.md](CLAUDE.md).
 - [x] Ciclos manuais (RN-128): encerrar/iniciar semestre no painel admin, folga conta no próximo ciclo,
       cashback zera só quando o admin manda, ciclos encerrados consultáveis no ranking.
 - [x] Estrelas maiores (altura das etiquetas DEF/MEI/ATA) e meia estrela com a parte vazia em preto (#000).
-- [ ] Usar nas próximas peladas e revisar com o dono: crédito do R$ 3 só com pagamento? desempate na linha de corte?
+- [x] Auditoria de ponto cego (2026-11-20): cashback só com pelada paga + Dinheiro (RN-120), ranking guardado e
+      exclusão bloqueada em ciclo encerrado (RN-129), reabrir ciclo (RN-130), períodos anteriores e acerto da festa
+      (RN-131), zerar seguro (RN-132), mescla entre admins nas configurações (RN-133).
+- [ ] Rodar de novo o `supabase/schema.sql` no Supabase para criar `admin_save_app_state_v2` (dono).
+- [ ] Usar nas próximas peladas e revisar com o dono: desempate na linha de corte?
 - [ ] 🔶 Importar o saldo da planilha (15/11/2026) — adiado pelo dono; conciliação de nomes já levantada.
 
 ### Cadastro (RN-01 a RN-07)

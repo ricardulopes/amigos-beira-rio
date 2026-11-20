@@ -10,7 +10,8 @@ import {
   transferPlayers, movePlayerInOrder, swapPlayers, moveGoalkeeper, setPermanence, RuleError,
   shareText, validatePinFormat, parseRoster, planRosterImport, applyRosterImport, rosterPlanSummary,
   rosterText, financeSettings, setPayment, addContribution, removeContribution, setPixConfig, setPixQr, resetCycle, QR_MAX_CHARS, formatMoney,
-  currentCycle, closeCycle, startCycle, suggestCycleLabel,
+  currentCycle, closeCycle, startCycle, suggestCycleLabel, reopenCycle, closedCycleOf, assertSessionDeletable, settleParty, unsettleParty,
+  PAYMENT_METHODS,
 } from '../domain/index.js';
 import { OFFICIAL_ROSTER } from '../data/lista-oficial.js';
 import { initCloud, login, logout, changePin, pullAll, flush, cloud } from '../cloud/sync.js';
@@ -571,7 +572,14 @@ const actions = {
     render();
   },
   'delete-session': (d) =>
-    withAdmin('history-delete', () => openModal('confirm', {
+    withAdmin('history-delete', () => {
+      // RN-129: pelada de ciclo encerrado fica blindada (o ranking do campeonato e o acerto dependem dela).
+      try {
+        assertSessionDeletable(app.db.sessions.find((x) => x.id === d.id), financeSettings(app.db.settings));
+      } catch (e) {
+        return toast(e.message, 'error', 6000);
+      }
+      openModal('confirm', {
       title: 'Excluir do histórico',
       text: 'Esta pelada será removida permanentemente do histórico de todos os aparelhos. Exporte um backup antes se quiser guardá-la.',
       okText: 'Excluir',
@@ -582,7 +590,8 @@ const actions = {
         app.ui.modal = null;
         navigate('/historico');
       },
-    })),
+    });
+    }),
 
   // ---------- backup
   export: () => {
@@ -663,7 +672,23 @@ const actions = {
     app.ui.paySid = d.id;
     render();
   },
-  'pay-set': (d) => exec('Pagamento', (s) => setPayment(s, d.pid, d.m || null), { sid: d.sid, undo: false, silent: true }),
+  'pay-set': (d) => {
+    const run = () => exec('Pagamento', (s) => setPayment(s, d.pid, d.m || null), { sid: d.sid, undo: false, silent: true });
+    const s = app.db.sessions.find((x) => x.id === d.sid);
+    const closed = closedCycleOf(s, financeSettings(app.db.settings));
+    if (!closed) return run();
+    // RN-129: pelada de ciclo encerrado — mudar o pagamento muda o cashback do acerto; pede confirmação.
+    const name = s?.snapshot?.[d.pid]?.name || 'o atleta';
+    openModal('confirm', {
+      title: 'Pelada de ciclo encerrado',
+      text: `Esta pelada é do ciclo "${closed.label}", já encerrado. Marcar ${name} como ${d.m ? PAYMENT_METHODS[d.m] : 'pendente'} muda o cashback dele nesse período (o ranking guardado não muda). Confirmar?`,
+      okText: 'Confirmar',
+      onOk: () => {
+        closeModal();
+        run();
+      },
+    });
+  },
   'contrib-new': (d) => openModal('contrib', { pid: d.pid || null, query: '', amount: '', note: '' }),
   'contrib-save': () => {
     const m = app.ui.modal;
@@ -719,16 +744,19 @@ const actions = {
   // RN-128: ciclos manuais (encerrar / iniciar), com palavra de confirmação
   'cycle-close': () => openModal('cycle', { mode: 'close', label: currentCycle(financeSettings(app.db.settings))?.label || '', confirm: '' }),
   'cycle-start': () => openModal('cycle', { mode: 'start', label: suggestCycleLabel(), reset: '', confirm: '' }),
+  'cycle-reopen': () => openModal('cycle', { mode: 'reopen', confirm: '' }),
   'cycle-ok': () => {
     const m = app.ui.modal;
-    const word = m.mode === 'close' ? 'ENCERRAR' : 'INICIAR';
+    const word = { close: 'ENCERRAR', start: 'INICIAR', reopen: 'REABRIR' }[m.mode];
     if (String(m.confirm || '').trim().toUpperCase() !== word) {
       m.error = `Digite ${word} para confirmar.`;
       return render();
     }
     try {
       const f = financeSettings(app.db.settings);
-      const res = m.mode === 'close' ? closeCycle(f, { label: m.label }) : startCycle(f, { label: m.label, resetCashback: !!m.reset });
+      const res = m.mode === 'close' ? closeCycle(f, { label: m.label, sessions: app.db.sessions })
+        : m.mode === 'reopen' ? reopenCycle(f, app.db.sessions)
+          : startCycle(f, { label: m.label, resetCashback: !!m.reset });
       app.db.settings.finance = res.finance;
       if (save()) {
         app.ui.modal = null;
@@ -741,14 +769,34 @@ const actions = {
     }
   },
   'reset-open': () => openModal('reset', { confirm: '' }),
+  // RN-131: acerto da festa por período (registro para a tesouraria conferir; não altera o cashback)
+  'party-settle': (d) => {
+    const name = app.db.players.find((p) => p.id === d.pid)?.name || d.name || 'o atleta';
+    openModal('confirm', {
+      title: 'Registrar acerto da festa',
+      text: `Registrar que a festa de ${name} (cashback desde ${d.label}: ${formatMoney(Number(d.cents) || 0)}) foi acertada? Fica guardado com a data de hoje.`,
+      okText: 'Registrar',
+      onOk: () => {
+        closeModal();
+        updateFinance((f) => settleParty(f, { pid: d.pid, name, periodKey: d.key, cents: Number(d.cents) || 0 }));
+      },
+    });
+  },
+  'party-unsettle': (d) => openModal('confirm', {
+    title: 'Desfazer acerto da festa',
+    text: 'Apagar o registro de acerto da festa deste período? O cashback não muda.',
+    okText: 'Desfazer',
+    danger: true,
+    onOk: () => {
+      closeModal();
+      updateFinance((f) => unsettleParty(f, d.id), 'Registro de acerto apagado.');
+    },
+  }),
   'reset-ok': () => {
     const m = app.ui.modal;
-    if (String(m.confirm || '').trim().toUpperCase() !== 'ZERAR') {
-      m.error = 'Digite ZERAR para confirmar.';
-      return render();
-    }
     try {
-      const r = resetCycle({ sessions: app.db.sessions, finance: financeSettings(app.db.settings) });
+      // RN-132: a palavra (ZERAR no teste, APAGAR TUDO no oficial), a pelada ao vivo e o rascunho são conferidos no domínio.
+      const r = resetCycle({ sessions: app.db.sessions, finance: financeSettings(app.db.settings), confirm: m.confirm });
       for (const s of app.db.sessions) store.clearUndo(s.id);
       app.db.sessions = r.sessions;
       app.db.activeSessionId = null;

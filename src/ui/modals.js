@@ -3,7 +3,7 @@ import { app, activeSession } from './state.js';
 import { esc, fmt, stars, roleBadge, positionsBadges, starPicker, posBadge, vestIcon } from './dom.js';
 import {
   ROLE_NAMES, REMOVAL_REASONS, filterPlayers, allTeamsInOrder, queueLabel, simulateTransfer, teamStats, linePositions, PIN_RULES, ADMIN_ACTIONS, rosterPlanSummary,
-  vestOf, vestPreview, financeSettings, resetPreview, formatMoney, currentCycle, cycleRanking,
+  vestOf, vestPreview, financeSettings, resetPreview, formatMoney, currentCycle, cycleRanking, reopenInfo, resetWord,
 } from '../domain/index.js';
 import { pixBlock } from './views.js';
 
@@ -167,9 +167,12 @@ function resetModal(m) {
   const f = financeSettings(app.db.settings);
   const pv = resetPreview(app.db.sessions, f);
   const total = f.contributions.reduce((t, c) => t + c.cents, 0);
+  const word = resetWord(f);
   const body = `
     ${m.error ? `<div class="alert error">${esc(m.error)}</div>` : ''}
+    ${pv.official ? '<div class="alert error">⚠️ O app já está no <b>ciclo oficial</b>: isto apaga o histórico <b>real</b> do grupo (rankings, presenças, pagamentos, cashback e acertos da festa). Use só se tiver certeza absoluta.</div>' : ''}
     ${pv.live ? '<div class="alert warn">Há uma pelada em andamento: encerre-a antes de zerar.</div>' : ''}
+    ${pv.draft ? '<div class="alert warn">Há um sorteio em rascunho: inicie ou descarte o rascunho antes de zerar.</div>' : ''}
     <p>Apaga <b>de todos os aparelhos e da nuvem</b>:</p>
     <ul class="warn-list">
       <li>${pv.peladas} pelada(s) com histórico, presenças e pagamentos (${pv.started} iniciada(s));</li>
@@ -177,16 +180,29 @@ function resetModal(m) {
     </ul>
     <p class="small">Continuam: cadastro de atletas (${app.db.players.length}), configuração do Pix e ajustes. Depois disso o app sai do modo teste e começa o <b>ciclo oficial</b> do zero.</p>
     <p class="small">Não dá para desfazer. Se quiser guardar uma cópia, exporte o backup antes: <button class="btn small" data-act="export">⬇ Exportar backup</button></p>
-    <label class="field"><span>Digite <b>ZERAR</b> para confirmar</span><input id="m-confirm" data-input="m:confirm" value="${esc(m.confirm || '')}" autocomplete="off" autocapitalize="characters"></label>`;
-  return shell('Zerar lançamentos de teste', body, '<button class="btn" data-act="modal-close">Cancelar</button><button class="btn danger" data-act="reset-ok">Zerar tudo</button>', 'tall');
+    <label class="field"><span>Digite <b>${word}</b> para confirmar</span><input id="m-confirm" data-input="m:confirm" value="${esc(m.confirm || '')}" autocomplete="off" autocapitalize="characters"></label>`;
+  return shell(pv.official ? 'Apagar todo o histórico' : 'Zerar lançamentos de teste', body,
+    `<button class="btn" data-act="modal-close">Cancelar</button><button class="btn danger" data-act="reset-ok" ${pv.live || pv.draft ? 'disabled' : ''}>${pv.official ? 'Apagar tudo' : 'Zerar tudo'}</button>`, 'tall');
 }
 
 /** RN-128: encerrar o ciclo aberto ou iniciar o próximo, com palavra de confirmação. */
 function cycleModal(m) {
   const closing = m.mode === 'close';
-  const word = closing ? 'ENCERRAR' : 'INICIAR';
+  const reopening = m.mode === 'reopen';
+  const word = closing ? 'ENCERRAR' : reopening ? 'REABRIR' : 'INICIAR';
   let body;
-  if (closing) {
+  if (reopening) {
+    // RN-130: desfaz um encerramento feito por engano.
+    const info = reopenInfo(financeSettings(app.db.settings), app.db.sessions);
+    body = info ? `
+      <p>Reabre <b>${esc(info.target.label)}</b> como se não tivesse sido encerrado.</p>
+      <ul class="warn-list">
+        <li>O ranking guardado no encerramento é descartado e volta a ser calculado pelas peladas.</li>
+        <li>Peladas e aportes feitos depois do encerramento (na folga) voltam a contar neste ciclo.</li>
+        ${info.drop ? `<li>O ciclo "${esc(info.drop.label)}", iniciado depois e ainda vazio, é desfeito.</li>` : ''}
+      </ul>
+      ${info.blocked ? `<div class="alert warn">${esc(info.blocked)}</div>` : ''}` : '<p>Não há ciclo encerrado para reabrir.</p>';
+  } else if (closing) {
     const f = financeSettings(app.db.settings);
     const cur = currentCycle(f);
     const total = cur ? cycleRanking(app.db.sessions, f, cur.id, 'line').total : 0;
@@ -206,8 +222,10 @@ function cycleModal(m) {
   }
   body = `${m.error ? `<div class="alert error">${esc(m.error)}</div>` : ''}${body}
     <label class="field"><span>Digite <b>${word}</b> para confirmar</span><input id="m-confirm" data-input="m:confirm" value="${esc(m.confirm || '')}" autocomplete="off" autocapitalize="characters"></label>`;
-  return shell(closing ? 'Encerrar ciclo/semestre' : 'Iniciar novo ciclo/semestre', body,
-    `<button class="btn" data-act="modal-close">Cancelar</button><button class="btn ${closing ? 'danger' : 'primary'}" data-act="cycle-ok">${closing ? 'Encerrar ciclo' : 'Iniciar ciclo'}</button>`, 'tall');
+  const title = closing ? 'Encerrar ciclo/semestre' : reopening ? 'Reabrir último ciclo' : 'Iniciar novo ciclo/semestre';
+  const ok = closing ? 'Encerrar ciclo' : reopening ? 'Reabrir ciclo' : 'Iniciar ciclo';
+  return shell(title, body,
+    `<button class="btn" data-act="modal-close">Cancelar</button><button class="btn ${closing || reopening ? 'danger' : 'primary'}" data-act="cycle-ok">${ok}</button>`, 'tall');
 }
 
 // --------------------------------------------------------------- importação em lote

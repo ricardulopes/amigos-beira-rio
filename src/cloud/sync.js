@@ -3,7 +3,7 @@
 // vai para uma fila (outbox) e é enviada assim que houver internet; mudanças de outros aparelhos chegam
 // em tempo real (Realtime). Regras de jogo continuam no domínio; aqui só se move dados.
 import { SUPABASE_URL, SUPABASE_KEY } from './config.js';
-import { emptyOutbox, outboxSize, diffDb, isEmptyDiff, addToOutbox, mergeRemote, rowToPlayer, playerToRow, appStateOf } from './diff.js';
+import { emptyOutbox, outboxSize, diffDb, isEmptyDiff, addToOutbox, mergeRemote, mergeAppState, rowToPlayer, playerToRow, appStateOf } from './diff.js';
 
 const K = { outbox: 'pelada.outbox', versions: 'pelada.versions', token: 'pelada.admin.token' };
 const RETRY_MS = 20000;
@@ -129,7 +129,7 @@ export function track(db) {
   const d = diffDb(baseline, db);
   if (isEmptyDiff(d)) return true;
   if (!adminSession()) return false;
-  ob = addToOutbox(ob, d, versions);
+  ob = addToOutbox(ob, d, versions, appStateOf(baseline));
   baseline = clone(db);
   persistQueue();
   flush();
@@ -201,17 +201,7 @@ export async function flush() {
       }
       persistQueue();
     }
-    if (ob.appState) {
-      ob.appState = false;
-      const st = appStateOf(hooks.getDb());
-      try {
-        await rpc('admin_save_app_state', { p_token: t.token, p_settings: st.settings, p_setup: st.setup, p_active_id: st.activeSessionId });
-      } catch (e) {
-        ob.appState = true;
-        throw e;
-      }
-      persistQueue();
-    }
+    if (ob.appState) await sendAppState(t.token);
     status({ lastSync: new Date().toISOString(), error: '', online: true, needLogin: false });
   } catch (e) {
     status({ error: e.message });
@@ -219,6 +209,43 @@ export async function flush() {
     flushing = false;
     scheduleRetry();
   }
+}
+
+/**
+ * RN-133: envia as configurações (aportes, ciclos, acertos, Pix, seleção) sem apagar o que outro admin
+ * gravou enquanto este aparelho estava sem sinal: lê a nuvem, mescla em três vias e grava só se a versão
+ * da nuvem não mudou no meio (senão lê e mescla de novo). Banco antigo sem a função nova: grava como antes.
+ */
+async function sendAppState(token) {
+  for (let attempt = 0; attempt < 4; attempt++) {
+    const local = appStateOf(hooks.getDb());
+    const { data: row, error } = await client.from('app_state').select('*').eq('id', 1).maybeSingle();
+    if (error) throw rpcError(error);
+    const remote = row ? { settings: row.settings ?? {}, setup: row.setup ?? null, activeSessionId: row.active_pelada_id ?? null } : null;
+    const merged = mergeAppState(ob.appStateBase, local, remote);
+    const args = { p_token: token, p_settings: merged.settings, p_setup: merged.setup, p_active_id: merged.activeSessionId };
+    const res = await client.rpc('admin_save_app_state_v2', { ...args, p_base_version: row?.version ?? 0 });
+    if (res.error) {
+      if (!/function .* does not exist|Could not find the function|schema cache/i.test(res.error.message || '')) throw rpcError(res.error);
+      await rpc('admin_save_app_state', args); // schema.sql ainda não atualizado no Supabase
+    } else if (res.data?.conflict) continue; // outro admin gravou no meio: lê e mescla de novo
+    // Traz para este aparelho o que veio do outro admin, sem perder o que mudou aqui durante o envio.
+    const now = appStateOf(hooks.getDb());
+    const changed = JSON.stringify(now) !== JSON.stringify(local);
+    const next = changed ? mergeAppState(local, now, merged) : merged;
+    if (JSON.stringify(next) !== JSON.stringify(now)) {
+      applyRemote((db) => {
+        db.settings = next.settings;
+        db.setup = next.setup;
+        db.activeSessionId = next.activeSessionId;
+      });
+    }
+    ob.appState = changed;
+    ob.appStateBase = changed ? merged : null;
+    persistQueue();
+    return;
+  }
+  throw new Error('Outro administrador está gravando as configurações agora. Tentando de novo em instantes.');
 }
 
 function scheduleRetry() {

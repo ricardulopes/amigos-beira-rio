@@ -7,7 +7,8 @@
 const json = (x) => JSON.stringify(x ?? null);
 
 export function emptyOutbox() {
-  return { players: [], playersDeleted: [], peladas: {}, peladasDeleted: [], appState: false };
+  // appStateBase: configurações como estavam (vindas da nuvem) quando a 1ª mudança local pendente foi feita.
+  return { players: [], playersDeleted: [], peladas: {}, peladasDeleted: [], appState: false, appStateBase: null };
 }
 
 export function outboxSize(ob) {
@@ -46,8 +47,9 @@ export function isEmptyDiff(d) {
  * mudança se baseou (a PRIMEIRA, para detectar conflito com outro admin). O conteúdo enviado é sempre
  * o estado atual do aparelho no momento do envio.
  */
-export function addToOutbox(ob, d, versions = {}) {
+export function addToOutbox(ob, d, versions = {}, appStateBase = null) {
   const o = JSON.parse(JSON.stringify(ob));
+  if (d.appState && !o.appState) o.appStateBase = appStateBase ? JSON.parse(JSON.stringify(appStateBase)) : null;
   for (const id of d.players) {
     if (!o.players.includes(id)) o.players.push(id);
     o.playersDeleted = o.playersDeleted.filter((x) => x !== id);
@@ -121,6 +123,50 @@ export function mergeRemote(local, remote, ob, versions = {}) {
     db.activeSessionId = remote.appState.activeSessionId ?? null;
   }
   return { db, versions: v };
+}
+
+// ------------------------------------------------------------------ mescla das configurações (RN-133)
+
+const isObj = (x) => x !== null && typeof x === 'object' && !Array.isArray(x);
+const isIdList = (x) => Array.isArray(x) && x.every((i) => isObj(i) && typeof i.id === 'string');
+
+/**
+ * Mescla em três vias: `base` (o que este aparelho tinha da nuvem quando mudou), `local` (este aparelho)
+ * e `remote` (a nuvem agora, possivelmente com mudanças de outro admin).
+ * - só um lado mudou → vale esse lado;
+ * - objetos → campo a campo;
+ * - listas com `id` (aportes, acertos, ciclos) → item a item: o que cada admin incluiu fica, o que um
+ *   excluiu sai, e um item alterado dos dois lados fica com a versão deste aparelho;
+ * - qualquer outro conflito real → vale este aparelho (quem está enviando agora).
+ */
+export function merge3(base, local, remote) {
+  if (json(local) === json(base)) return remote;
+  if (json(remote) === json(base) || json(remote) === json(local)) return local;
+  if (isObj(local) && isObj(remote)) {
+    const b = isObj(base) ? base : {};
+    const out = {};
+    for (const k of new Set([...Object.keys(remote), ...Object.keys(local)])) {
+      const v = merge3(b[k], local[k], remote[k]);
+      if (v !== undefined) out[k] = v;
+    }
+    return out;
+  }
+  if (isIdList(local) && isIdList(remote) && (base === undefined || base === null || isIdList(base))) {
+    const by = (list) => new Map((list || []).map((i) => [i.id, i]));
+    const b = by(base);
+    const l = by(local);
+    const r = by(remote);
+    const ids = [...r.keys(), ...[...l.keys()].filter((id) => !r.has(id))];
+    return ids.map((id) => merge3(b.get(id), l.get(id), r.get(id))).filter((x) => x !== undefined);
+  }
+  return local;
+}
+
+/** Configurações a enviar: as deste aparelho mescladas com as da nuvem (sem apagar o que outro admin gravou). */
+export function mergeAppState(base, local, remote) {
+  if (!base || !remote) return local;
+  const m = merge3(base, local, remote);
+  return { settings: m.settings ?? {}, setup: m.setup ?? null, activeSessionId: m.activeSessionId ?? null };
 }
 
 function dedupeById(list) {

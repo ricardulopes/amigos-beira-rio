@@ -6,6 +6,7 @@ import {
   FINANCE_RULES, formatMoney, parseMoney, financeSettings, setPixConfig, setPixQr, attendanceRecords, cyclesAvailable,
   cycleRanking, cycleCashback, statement, groupCashback, paymentSummary, setPayment, addContribution, removeContribution,
   resetPreview, resetCycle, validate, cycleList, currentCycle, closeCycle, startCycle, suggestCycleLabel, FIRST_CYCLE_ID, NEXT_CYCLE,
+  isPaid, closedCycleOf, assertSessionDeletable, reopenInfo, reopenCycle, settleParty, unsettleParty, financeAthletes, resetWord,
 } from '../src/domain/index.js';
 
 /** Fecha o ciclo aberto e abre outro (datas explícitas). */
@@ -143,10 +144,11 @@ suite('Financeiro — presenças e rankings por ciclo', () => {
 
 suite('Financeiro — cashback, extrato e aportes', () => {
   test('RN-120/RN-128: linha soma R$ 3 por presença; goleiro só por aportes; zera só quando o admin manda', () => {
+    const paid = { payments: { rog: 'pix' } };
     const s = [
-      pel('a', '2025-12-20T09:00:00', [L('rog', 'Rogério')]),
-      pel('b', '2026-01-10T09:00:00', [L('rog', 'Rogério'), G('jp', 'JP')]),
-      pel('c', '2026-08-10T09:00:00', [L('rog', 'Rogério'), G('jp', 'JP')]),
+      pel('a', '2025-12-20T09:00:00', [L('rog', 'Rogério')], paid),
+      pel('b', '2026-01-10T09:00:00', [L('rog', 'Rogério'), G('jp', 'JP')], paid),
+      pel('c', '2026-08-10T09:00:00', [L('rog', 'Rogério'), G('jp', 'JP')], paid),
     ];
     let f = fin();
     f = addContribution(f, { pid: 'jp', name: 'JP', amount: '50,00', at: '2025-11-01T10:00:00' }).finance;
@@ -168,12 +170,12 @@ suite('Financeiro — cashback, extrato e aportes', () => {
     assert.equal(g.total, 3000, 'só o aporte do período atual');
     assert.equal(groupCashback(s, f, cur).total, 600 + 3000);
     const st = statement('rog', s, f);
-    assert.equal(st.previousCashback.total, 300, 'extrato mostra o cashback do período zerado, para o acerto da festa');
-    assert.equal(statement('rog', s, fin()).previousCashback, null);
+    assert.deepEqual(st.previousCashbacks.map((p) => p.total), [300], 'extrato mostra o cashback do período zerado, para o acerto da festa');
+    assert.deepEqual(statement('rog', s, fin()).previousCashbacks, []);
   });
 
   test('RN-123: festa de R$ 300 — paga só a diferença; quitada quando o cashback chega a R$ 300', () => {
-    const many = Array.from({ length: 100 }, (_, i) => pel(`p${i}`, `2026-0${1 + (i % 9)}-0${1 + (i % 9)}T09:00:00`, [L('erik', 'Erik')]));
+    const many = Array.from({ length: 100 }, (_, i) => pel(`p${i}`, `2026-0${1 + (i % 9)}-0${1 + (i % 9)}T09:00:00`, [L('erik', 'Erik')], { payments: { erik: i % 2 ? 'card' : 'cash' } }));
     const r = cycleCashback('erik', many, fin(), FIRST_CYCLE_ID);
     assert.equal(r.total, 30000);
     assert.ok(r.partyPaid);
@@ -181,7 +183,7 @@ suite('Financeiro — cashback, extrato e aportes', () => {
   });
 
   test('RN-124/RN-128: na folga o extrato mostra o ciclo encerrado e avisa o que vai para o próximo', () => {
-    const s = [pel('a', '2026-11-15T09:00:00', [L('erik', 'Erik')]), pel('b', '2026-11-29T09:00:00', [L('erik', 'Erik')])];
+    const s = [pel('a', '2026-11-15T09:00:00', [L('erik', 'Erik')], { payments: { erik: 'pix' } }), pel('b', '2026-11-29T09:00:00', [L('erik', 'Erik')])];
     const f = closeCycle(fin(), { label: '2º semestre de 2026' }, '2026-11-20T12:00:00').finance;
     const st = statement('erik', s, f);
     assert.equal(st.cycle.label, '2º semestre de 2026');
@@ -202,10 +204,12 @@ suite('Financeiro — cashback, extrato e aportes', () => {
     assert.equal(st.name, 'Erik');
     assert.deepEqual([st.cycle.total, st.cycle.line, st.cycle.gk, st.cycle.linePct], [4, 2, 1, 50]);
     assert.equal(st.waiting, 0);
-    assert.equal(st.cashback.total, 2 * 300 + 1000);
+    assert.equal(st.cashback.total, 300 + 1000, 'só a pelada paga ("a") gera R$ 3; "d" está pendente');
+    assert.equal(st.cashback.uncredited, 1);
     assert.equal(st.pending, 1, 'pelada "d" sem pagamento registrado');
     assert.equal(st.entries.length, 4);
     assert.equal(st.entries[0].kind, 'contribution', 'mais recente primeiro');
+    assert.deepEqual(st.entries.filter((e) => e.kind === 'game').map((e) => e.cents), [0, 0, 300], 'd pendente, c no gol, a paga');
   });
 
   test('Aportes: valida atleta, valor e observação; remove pelo id', () => {
@@ -225,6 +229,7 @@ suite('Financeiro — pagamentos do dia e reset', () => {
     const pid = s.teams.t1.line[0].pid;
     const { state } = setPayment(s, pid, 'pix');
     assert.equal(state.payments[pid], 'pix');
+    assert.equal(setPayment(s, pid, 'cash').state.payments[pid], 'cash', 'Dinheiro é forma de pagamento');
     assert.equal(s.payments, undefined, 'o estado recebido não muda');
     validate(state);
     assert.throws(() => setPayment(s, 'T1G1', 'pix'), /isento/);
@@ -240,27 +245,121 @@ suite('Financeiro — pagamentos do dia e reset', () => {
     s = setPayment(s, ids[1], 'pix').state;
     s = setPayment(s, ids[2], 'card').state;
     s = setPayment(s, ids[3], 'exempt').state;
+    s = setPayment(s, ids[4], 'cash').state;
     const p = paymentSummary(s);
-    assert.deepEqual([p.pix, p.card, p.pending, p.exempt], [2, 1, 6, 1 + 2]);
-    assert.equal(p.collected, 3 * 1800);
-    assert.equal(p.operational, 3 * 1500);
-    assert.equal(p.cashbackRetained, 3 * 300);
+    assert.deepEqual([p.pix, p.card, p.cash, p.pending, p.exempt], [2, 1, 1, 5, 1 + 2]);
+    assert.equal(p.collected, 4 * 1800);
+    assert.equal(p.operational, 4 * 1500);
+    assert.equal(p.cashbackRetained, 4 * 300);
     assert.equal(p.expected, 9 * 1800, 'linha isenta não entra no esperado');
     assert.equal(p.rows.find((r) => r.pid === 'T1G1').method, 'exempt');
   });
 
   test('RN-127: zerar apaga peladas e aportes, mantém Pix e cadastro, e inicia o ciclo oficial', () => {
-    const s = [pel('a', '2026-08-02T09:00:00', [L('x')]), pel('b', '2026-08-09T09:00:00', [L('x')], { status: 'draft' })];
+    const draft = pel('b', '2026-08-09T09:00:00', [L('x')], { status: 'draft' });
+    const s = [pel('a', '2026-08-02T09:00:00', [L('x')])];
     let f = setPixConfig(fin(), { pixKey: 'chave' });
     f = addContribution(f, { pid: 'x', amount: '30' }).finance;
-    assert.deepEqual(resetPreview(s, f), { peladas: 2, started: 1, contributions: 1, live: false });
-    const r = resetCycle({ sessions: s, finance: f }, '2027-01-01T00:00:00');
+    assert.deepEqual(resetPreview([...s, draft], f), { peladas: 2, started: 1, contributions: 1, live: false, draft: true, official: false });
+    assert.throws(() => resetCycle({ sessions: [...s, draft], finance: f, confirm: 'ZERAR' }), /rascunho/, 'RN-132: rascunho bloqueia o zerar');
+    assert.throws(() => resetCycle({ sessions: s, finance: f, confirm: 'zera' }), /Digite ZERAR/);
+    const r = resetCycle({ sessions: s, finance: f, confirm: ' zerar ' }, '2027-01-01T00:00:00');
     assert.deepEqual(r.sessions, []);
     assert.deepEqual(r.finance.contributions, []);
     assert.equal(r.finance.pixKey, 'chave');
     assert.equal(r.finance.mode, 'official');
     assert.equal(r.finance.cycleStart, '2027-01-01T00:00:00');
     assert.deepEqual(cycleList(r.finance).map((c) => [c.id, c.start, c.open]), [[FIRST_CYCLE_ID, '2027-01-01T00:00:00', true]], 'ciclos voltam ao 1º');
-    assert.throws(() => resetCycle({ sessions: [pel('c', '2026-08-02T09:00:00', [L('x')], { status: 'live' })], finance: f }), /andamento/);
+    assert.throws(() => resetCycle({ sessions: [pel('c', '2026-08-02T09:00:00', [L('x')], { status: 'live' })], finance: f, confirm: 'ZERAR' }), /andamento/);
+    // RN-132: no ciclo oficial a palavra é mais forte
+    assert.equal(resetWord(r.finance), 'APAGAR TUDO');
+    assert.throws(() => resetCycle({ sessions: s, finance: r.finance, confirm: 'ZERAR' }), /APAGAR TUDO/);
+    assert.equal(resetCycle({ sessions: s, finance: r.finance, confirm: 'apagar tudo' }).sessions.length, 0);
+  });
+});
+
+suite('Financeiro — proteções (RN-120, RN-129 a RN-132)', () => {
+  test('RN-120: R$ 3 só com pelada paga (Pix, Cartão, Dinheiro); pendente e isento não geram; caixa e cashback batem', () => {
+    const ps = [L('pix'), L('card'), L('cash'), L('pend'), L('isen'), G('gol')];
+    const s = [pel('a', '2026-08-02T09:00:00', ps, { payments: { pix: 'pix', card: 'card', cash: 'cash', isen: 'exempt' } })];
+    const recs = attendanceRecords(s);
+    assert.deepEqual(recs.filter((r) => r.credited).map((r) => r.pid), ['pix', 'card', 'cash']);
+    assert.equal(cycleCashback('pend', s, fin(), FIRST_CYCLE_ID).total, 0);
+    assert.equal(cycleCashback('isen', s, fin(), FIRST_CYCLE_ID).total, 0);
+    assert.equal(cycleCashback('gol', s, fin(), FIRST_CYCLE_ID).total, 0, 'goleiro continua só com aportes');
+    assert.equal(cycleCashback('cash', s, fin(), FIRST_CYCLE_ID).total, 300);
+    assert.equal(groupCashback(s, fin(), FIRST_CYCLE_ID).line, paymentSummary(s[0]).cashbackRetained, 'o que o caixa reteve = cashback prometido');
+    assert.ok(isPaid('cash') && !isPaid('exempt') && !isPaid(null));
+  });
+
+  test('RN-129: ranking guardado no encerramento não muda se uma pelada for excluída depois; exclusão bloqueada', () => {
+    const s = [
+      pel('a', '2026-08-02T09:00:00', [L('ana', 'Ana'), L('bia', 'Bia'), G('gu', 'Gu')]),
+      pel('b', '2026-08-09T09:00:00', [L('ana', 'Ana')]),
+      pel('c', '2026-12-01T09:00:00', [L('bia', 'Bia')]), // folga
+      pel('d', '2026-12-08T09:00:00', [L('bia', 'Bia')], { status: 'draft' }),
+    ];
+    const f = closeCycle(fin(), { sessions: s }, '2026-11-20T12:00:00').finance;
+    const r = cycleRanking(s.filter((x) => x.id !== 'b'), f, FIRST_CYCLE_ID, 'line');
+    assert.ok(r.frozen);
+    assert.equal(r.total, 2);
+    assert.deepEqual(r.rows.map((x) => [x.name, x.count]), [['Ana', 2], ['Bia', 1]], 'blindado contra a exclusão');
+    assert.deepEqual(cycleRanking([], f, FIRST_CYCLE_ID, 'gk').rows.map((x) => x.name), ['Gu']);
+    assert.equal(closedCycleOf(s[0], f).id, FIRST_CYCLE_ID);
+    assert.throws(() => assertSessionDeletable(s[1], f), /já encerrado/);
+    assert.equal(closedCycleOf(s[2], f), null, 'pelada da folga pode ser excluída');
+    assert.equal(closedCycleOf(s[3], f), null, 'rascunho não é bloqueado');
+    assert.equal(closedCycleOf(s[0], fin()), null, 'ciclo aberto: livre');
+  });
+
+  test('RN-130: reabrir o último ciclo encerrado (na folga ou desfazendo um ciclo novo ainda vazio)', () => {
+    const s = [pel('a', '2026-08-02T09:00:00', [L('ana')]), pel('b', '2026-12-01T09:00:00', [L('ana')])];
+    assert.equal(reopenInfo(fin(), s), null);
+    assert.throws(() => reopenCycle(fin(), s), /Não há ciclo encerrado/);
+    let f = closeCycle(fin(), { label: '2º semestre de 2026', sessions: s }, '2026-11-20T12:00:00').finance;
+    const back = reopenCycle(f, s).finance;
+    assert.equal(currentCycle(back).id, FIRST_CYCLE_ID);
+    assert.equal(back.cycles[0].frozen, undefined, 'ranking guardado é descartado');
+    assert.equal(cycleRanking(s, back, FIRST_CYCLE_ID, 'line').total, 2, 'a pelada da folga volta a contar');
+    // ciclo novo vazio é desfeito; com pelada, não dá mais
+    const started = startCycle(f, { label: '1º semestre de 2027' }, '2027-01-05T08:00:00').finance;
+    const info = reopenInfo(started, s);
+    assert.equal(info.drop.label, '1º semestre de 2027');
+    assert.equal(info.blocked, '');
+    const undone = reopenCycle(started, s).finance;
+    assert.deepEqual(cycleList(undone).map((c) => [c.label, c.open]), [['2º semestre de 2026', true]]);
+    const used = [...s, pel('c', '2027-01-10T09:00:00', [L('ana')])];
+    assert.throws(() => reopenCycle(started, used), /já tem peladas/);
+    f = addContribution(started, { pid: 'g', name: 'G', amount: '30', at: '2027-01-06T10:00:00' }).finance;
+    assert.ok(reopenInfo(f, s).blocked, 'aporte no ciclo novo também bloqueia');
+  });
+
+  test('RN-131: extrato mostra todos os períodos anteriores e o acerto da festa registrado', () => {
+    const paid = { payments: { rog: 'pix' } };
+    const s = [
+      pel('a', '2025-03-01T09:00:00', [L('rog', 'Rogério')], paid),
+      pel('b', '2026-03-01T09:00:00', [L('rog', 'Rogério')], paid),
+      pel('c', '2027-03-01T09:00:00', [L('rog', 'Rogério')], paid),
+    ];
+    let f = turn(fin(), '2026-01-01T00:00:00', '2026-01-02T00:00:00', '2026', true);
+    f = turn(f, '2027-01-01T00:00:00', '2027-01-02T00:00:00', '2027', true);
+    let st = statement('rog', s, f);
+    assert.deepEqual(st.previousCashbacks.map((p) => [p.sinceLabel, p.total]), [['2026', 300], ['1º ciclo', 300]], 'dois períodos zerados, mais recente primeiro');
+    const key = st.previousCashbacks[1].periodKey;
+    f = settleParty(f, { pid: 'rog', name: 'Rogério', periodKey: key, cents: 300, note: 'pagou a diferença' }, '2026-01-10T10:00:00').finance;
+    assert.throws(() => settleParty(f, { pid: 'rog', periodKey: key }), /já foi registrado/);
+    st = statement('rog', s, f);
+    assert.equal(st.previousCashbacks[1].settlement.note, 'pagou a diferença');
+    assert.equal(st.previousCashbacks[1].total, 300, 'o acerto não altera o cashback');
+    assert.equal(st.previousCashbacks[0].settlement, null);
+    const id = st.previousCashbacks[1].settlement.id;
+    assert.equal(unsettleParty(f, id).partySettlements.length, 0);
+  });
+
+  test('Goleiro excluído do cadastro que só tem aportes continua com extrato acessível', () => {
+    const f = addContribution(fin(), { pid: 'gk-x', name: 'Goleiro X', amount: '50' }).finance;
+    const list = financeAthletes([{ id: 'ana', name: 'Ana' }], [pel('a', '2026-08-02T09:00:00', [L('bia', 'Bia')])], f);
+    assert.deepEqual(list.map((x) => [x.name, x.removed]), [['Ana', false], ['Bia', true], ['Goleiro X', true]]);
+    assert.equal(statement('gk-x', [], f).cashback.total, 5000);
   });
 });

@@ -19,7 +19,10 @@ export const FINANCE_RULES = {
   maxContribution: 1000000, // R$ 10.000 por aporte (proteção contra digitação errada)
 };
 
-export const PAYMENT_METHODS = { pix: 'Pix', card: 'Cartão', exempt: 'Isento' };
+export const PAYMENT_METHODS = { pix: 'Pix', card: 'Cartão', cash: 'Dinheiro', exempt: 'Isento' };
+/** Formas que quitam a pelada (RN-120): só elas geram os R$ 3 de cashback. Pendente e Isento não geram. */
+const PAID = new Set(['pix', 'card', 'cash']);
+export const isPaid = (method) => PAID.has(method);
 
 const COUNTED = new Set(['live', 'finished']);
 
@@ -60,6 +63,7 @@ export function financeSettings(settings = {}) {
     contributions: Array.isArray(f.contributions) ? f.contributions : [],
     cycleStart: f.cycleStart || null,
     cycles: Array.isArray(f.cycles) ? f.cycles : [],
+    partySettlements: Array.isArray(f.partySettlements) ? f.partySettlements : [],
   };
 }
 
@@ -106,7 +110,9 @@ export const NEXT_CYCLE = 'proximo';
 const NEXT_LABEL = 'Próximo ciclo (ainda não iniciado)';
 const MAX_LABEL = 40;
 
-const plainCycle = ({ id, label, start, end, resetCashback }) => ({ id, label, start: start || null, end: end || null, resetCashback: !!resetCashback });
+const plainCycle = ({ id, label, start, end, resetCashback, frozen }) => ({
+  id, label, start: start || null, end: end || null, resetCashback: !!resetCashback, ...(end && frozen ? { frozen } : {}),
+});
 
 /**
  * RN-128: ciclos (semestres) abertos e encerrados manualmente pelo admin, em ordem.
@@ -160,7 +166,10 @@ export function attendanceRecords(sessions = [], finance = {}) {
     const date = dateOf(s);
     const cycleId = cycleKey(cycles, date);
     for (const p of Object.values(s.snapshot)) {
-      out.push({ sid: s.id, title: s.title, date, cycleId, pid: p.id, name: p.name, type: p.type === 'gk' ? 'gk' : 'line', payment: paymentOf(s, p.id) });
+      const type = p.type === 'gk' ? 'gk' : 'line';
+      const payment = paymentOf(s, p.id);
+      // RN-120: R$ 3 só na presença de linha quitada (Pix, Cartão ou Dinheiro).
+      out.push({ sid: s.id, title: s.title, date, cycleId, pid: p.id, name: p.name, type, payment, credited: type === 'line' && isPaid(payment) });
     }
   }
   return out;
@@ -181,12 +190,9 @@ export function cyclesAvailable(sessions = [], finance = {}) {
  * Total de jogos = peladas iniciadas no ciclo. Ordem: mais presenças; empate, ordem alfabética.
  * Os `top` primeiros (32 na linha, 4 no gol) têm vaga prioritária no campeonato.
  */
-export function cycleRanking(sessions, finance, cycleId, type = 'line') {
-  const cycles = cycleList(finance);
-  const cycle = cycles.find((c) => c.id === cycleId) || { id: NEXT_CYCLE, label: NEXT_LABEL, start: null, end: null, open: false, pending: true };
-  const top = type === 'gk' ? FINANCE_RULES.topGk : FINANCE_RULES.topLine;
-  const peladas = countedPeladas(sessions).filter((s) => cycleKey(cycles, dateOf(s)) === cycle.id);
-  const total = peladas.length;
+/** Contagem de presenças de um ciclo calculada a partir das peladas (sem posições). */
+function liveCounts(sessions, cycles, cycleId, type) {
+  const peladas = countedPeladas(sessions).filter((s) => cycleKey(cycles, dateOf(s)) === cycleId);
   const counts = new Map();
   for (const s of peladas) {
     for (const p of Object.values(s.snapshot)) {
@@ -197,11 +203,38 @@ export function cycleRanking(sessions, finance, cycleId, type = 'line') {
       counts.set(p.id, c);
     }
   }
-  const rows = [...counts.values()]
+  return { total: peladas.length, rows: [...counts.values()] };
+}
+
+export function cycleRanking(sessions, finance, cycleId, type = 'line') {
+  const cycles = cycleList(finance);
+  const cycle = cycles.find((c) => c.id === cycleId) || { id: NEXT_CYCLE, label: NEXT_LABEL, start: null, end: null, open: false, pending: true };
+  const top = type === 'gk' ? FINANCE_RULES.topGk : FINANCE_RULES.topLine;
+  // RN-129: ciclo encerrado usa o ranking guardado no encerramento (blindado contra exclusões depois).
+  const saved = !cycle.open && cycle.frozen?.[type];
+  const base = saved ? { total: saved.total, rows: saved.rows.map((r) => ({ ...r })) } : liveCounts(sessions, cycles, cycle.id, type);
+  const total = base.total;
+  const rows = base.rows
     .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name, 'pt-BR'))
     .map((r, i) => ({ ...r, position: i + 1, pct: total ? Math.round((r.count / total) * 100) : 0, qualified: i < top }));
   const cutTie = rows.length > top && rows[top - 1].count === rows[top].count;
-  return { cycle, type, total, top, rows, cutTie };
+  return { cycle, type, total, top, rows, cutTie, frozen: !!saved };
+}
+
+/**
+ * RN-129: ciclo encerrado a que a pelada pertence (null se o ciclo dela está aberto, se é da folga ou
+ * se ela ainda é rascunho). Pelada de ciclo encerrado não pode ser excluída; mexer no pagamento pede confirmação.
+ */
+export function closedCycleOf(session, finance) {
+  if (!session || !COUNTED.has(session.status)) return null;
+  const c = cycleOfDate(cycleList(finance), dateOf(session));
+  return c && c.end ? c : null;
+}
+
+/** Lança RuleError se a pelada pertence a um ciclo encerrado (exclusão bloqueada). */
+export function assertSessionDeletable(session, finance) {
+  const c = closedCycleOf(session, finance);
+  if (c) throw new RuleError(`Esta pelada faz parte do ciclo "${c.label}", já encerrado. Para excluí-la, reabra o ciclo primeiro (Ajustes → Financeiro e Pix).`);
 }
 
 // ---------------------------------------------------------------- abrir e encerrar ciclos (RN-128)
@@ -223,14 +256,55 @@ function cleanLabel(label, cycles, exceptId) {
  * Encerra o ciclo aberto (o ranking dele fica guardado para conferência). Pode renomeá-lo ao encerrar.
  * Peladas feitas depois disso contam no próximo ciclo, quando o admin iniciá-lo.
  */
-export function closeCycle(finance, { label } = {}, now = new Date().toISOString()) {
+export function closeCycle(finance, { label, sessions } = {}, now = new Date().toISOString()) {
   const cycles = cycleList(finance);
   const cur = cycles.find((c) => c.open);
   if (!cur) throw new RuleError('Não há ciclo aberto para encerrar.');
   if (cur.start && ms(now) <= ms(cur.start)) throw new RuleError('A data de encerramento precisa ser depois do início do ciclo.');
   const name = label == null || label === '' ? cur.label : cleanLabel(label, cycles, cur.id);
-  const list = cycles.map(plainCycle).map((c) => (c.id === cur.id ? { ...c, label: name, end: now } : c));
-  return { finance: { ...finance, cycles: list }, message: `${name} encerrado. O ranking dele continua disponível para consulta.` };
+  let list = cycles.map(plainCycle).map((c) => (c.id === cur.id ? { ...c, label: name, end: now } : c));
+  if (Array.isArray(sessions)) {
+    // RN-129: guarda o ranking do encerramento (linha e gol) para o sorteio do campeonato.
+    const closed = cycleList({ ...finance, cycles: list });
+    const frozen = { at: now, line: liveCounts(sessions, closed, cur.id, 'line'), gk: liveCounts(sessions, closed, cur.id, 'gk') };
+    list = list.map((c) => (c.id === cur.id ? { ...c, frozen } : c));
+  }
+  return { finance: { ...finance, cycles: list }, message: `${name} encerrado. O ranking dele ficou guardado para consulta.` };
+}
+
+/**
+ * RN-130: o que "reabrir o último ciclo encerrado" faria. Na folga reabre o último encerrado; se um ciclo
+ * novo já foi iniciado, só é possível enquanto ele estiver vazio (sem pelada nem aporte) — ele é desfeito.
+ * Devolve null quando não há o que reabrir; `blocked` explica por que não dá.
+ */
+export function reopenInfo(finance, sessions = []) {
+  const cycles = cycleList(finance);
+  const open = cycles.find((c) => c.open);
+  const closed = cycles.filter((c) => c.end);
+  if (!closed.length) return null;
+  const target = closed[closed.length - 1];
+  if (!open) return { target, drop: null };
+  if (open.index !== cycles.length - 1 || open.index !== target.index + 1) return null;
+  // "Vazio" = nada lançado depois do início dele (o que é da folga volta para o ciclo reaberto).
+  const after = (iso) => !open.start || ms(iso) >= ms(open.start);
+  const used = countedPeladas(sessions).some((s) => after(dateOf(s)))
+    || (finance.contributions || []).some((c) => after(c.at));
+  return { target, drop: open, blocked: used ? `O ciclo "${open.label}" já tem peladas ou aportes; não dá mais para reabrir o anterior.` : '' };
+}
+
+/** RN-130: reabre o último ciclo encerrado (por engano). O ranking guardado é descartado e volta a ser calculado. */
+export function reopenCycle(finance, sessions = []) {
+  const info = reopenInfo(finance, sessions);
+  if (!info) throw new RuleError('Não há ciclo encerrado para reabrir.');
+  if (info.blocked) throw new RuleError(info.blocked);
+  const list = cycleList(finance)
+    .filter((c) => c.id !== info.drop?.id)
+    .map(plainCycle)
+    .map(({ frozen, ...c }) => (c.id === info.target.id ? { ...c, end: null } : { ...c, ...(frozen ? { frozen } : {}) }));
+  return {
+    finance: { ...finance, cycles: list },
+    message: `${info.target.label} reaberto.${info.drop ? ` O ciclo "${info.drop.label}" (vazio) foi desfeito.` : ''} Peladas e aportes feitos depois do encerramento voltam a contar nele.`,
+  };
 }
 
 /** Inicia um ciclo novo a partir de agora. `resetCashback` começa um período de cashback novo (novo ano da festa). */
@@ -263,16 +337,20 @@ export function cycleCashback(pid, sessions, finance, cycleId) {
   const cycles = cycleList(finance);
   const ids = periodIds(cycles, cycleId);
   const recs = attendanceRecords(sessions, finance).filter((r) => r.pid === pid && ids.has(r.cycleId));
-  const lineGames = recs.filter((r) => r.type === 'line').length;
-  const gkGames = recs.length - lineGames;
+  const lineRecs = recs.filter((r) => r.type === 'line');
+  const lineGames = lineRecs.filter((r) => r.credited).length; // RN-120: só presenças quitadas
+  const uncredited = lineRecs.length - lineGames;
+  const gkGames = recs.length - lineRecs.length;
   const lineCents = lineGames * FINANCE_RULES.cashbackPerGame;
   const contributions = (finance?.contributions || []).filter((c) => c.pid === pid && ids.has(cycleKey(cycles, c.at)));
   const contribCents = contributions.reduce((t, c) => t + c.cents, 0);
   const total = lineCents + contribCents;
   const first = cycles.find((c) => ids.has(c.id));
+  const periodKey = first?.id || NEXT_CYCLE;
   return {
-    since: first?.start || null, sinceLabel: first?.label || NEXT_LABEL,
-    lineGames, gkGames, lineCents, contribCents, total, contributions,
+    since: first?.start || null, sinceLabel: first?.label || NEXT_LABEL, periodKey,
+    lineGames, uncredited, gkGames, lineCents, contribCents, total, contributions,
+    settlement: (finance?.partySettlements || []).find((x) => x.pid === pid && x.period === periodKey) || null,
     partyFee: FINANCE_RULES.partyFee,
     partyRemaining: Math.max(0, FINANCE_RULES.partyFee - total),
     partyPaid: total >= FINANCE_RULES.partyFee,
@@ -295,33 +373,75 @@ export function statement(pid, sessions, finance) {
   const ids = periodIds(cycles, cycle.id);
   const entries = [
     ...recs.filter((r) => ids.has(r.cycleId)).map((r) => ({
-      date: r.date, kind: 'game', type: r.type, title: r.title, payment: r.payment,
-      cents: r.type === 'line' ? FINANCE_RULES.cashbackPerGame : 0,
+      date: r.date, kind: 'game', type: r.type, title: r.title, payment: r.payment, credited: r.credited,
+      cents: r.credited ? FINANCE_RULES.cashbackPerGame : 0,
     })),
     ...cash.contributions.map((c) => ({ date: c.at, kind: 'contribution', title: c.note || 'Aporte livre', cents: c.cents, id: c.id })),
   ].sort((a, b) => b.date.localeCompare(a.date));
   const waiting = recs.filter((r) => r.cycleId === NEXT_CYCLE).length
     + (finance?.contributions || []).filter((c) => c.pid === pid && cycleKey(cycles, c.at) === NEXT_CYCLE).length;
   const name = recs.length ? recs[recs.length - 1].name : (finance?.contributions || []).find((c) => c.pid === pid)?.name || '';
-  // Período de cashback anterior (já zerado), para o acerto da festa depois de iniciar o ciclo novo.
-  const prevCycle = cycles.filter((c) => c.period === cycle.period - 1).pop();
+  // RN-131: todos os períodos de cashback anteriores (já zerados), do mais recente ao mais antigo, para o acerto.
+  const previous = [];
+  for (let p = cycle.period - 1; p >= 0; p--) {
+    const first = cycles.find((c) => c.period === p);
+    if (first) previous.push(cycleCashback(pid, sessions, finance, first.id));
+  }
   return {
     pid, name, cycle: { ...cycle, total, line, gk, linePct: total ? Math.round((line / total) * 100) : 0, gkPct: total ? Math.round((gk / total) * 100) : 0 },
     cashback: cash, entries, waiting,
-    previousCashback: prevCycle ? cycleCashback(pid, sessions, finance, prevCycle.id) : null,
+    previousCashbacks: previous,
     pending: recs.filter((r) => r.type === 'line' && !r.payment).length,
   };
 }
 
-/** Total de cashback do grupo no período do ciclo (linha + aportes) e os aportes desse período. */
+/** Total de cashback do grupo no período do ciclo (linha quitada + aportes) e os aportes desse período. */
 export function groupCashback(sessions, finance, cycleId) {
   const cycles = cycleList(finance);
   const ids = periodIds(cycles, cycleId);
-  const games = attendanceRecords(sessions, finance).filter((r) => ids.has(r.cycleId) && r.type === 'line').length;
+  const games = attendanceRecords(sessions, finance).filter((r) => ids.has(r.cycleId) && r.credited).length;
   const line = games * FINANCE_RULES.cashbackPerGame;
   const contributions = (finance?.contributions || []).filter((c) => ids.has(cycleKey(cycles, c.at)));
   const contrib = contributions.reduce((t, c) => t + c.cents, 0);
   return { line, contrib, total: line + contrib, contributions };
+}
+
+// ---------------------------------------------------------------- acerto da festa (RN-131)
+
+/**
+ * Registra que a festa do período foi acertada com o atleta (cashback usado/diferença paga). Fica guardado
+ * para a tesouraria conferir depois; não altera o cashback. Um registro por atleta por período.
+ */
+export function settleParty(finance, { pid, name = '', periodKey, cents = 0, note = '' }, now = new Date().toISOString()) {
+  if (!pid || !periodKey) throw new RuleError('Escolha o atleta e o período.');
+  const list = finance.partySettlements || [];
+  if (list.some((x) => x.pid === pid && x.period === periodKey)) throw new RuleError('O acerto da festa deste período já foi registrado.');
+  const n = String(note || '').trim();
+  if (n.length > 80) throw new RuleError('A observação tem no máximo 80 caracteres.');
+  const s = { id: newId('fx'), pid, name: String(name || '').trim(), period: periodKey, cents: Math.max(0, Math.round(Number(cents) || 0)), note: n, at: now };
+  return { finance: { ...finance, partySettlements: [...list, s] }, message: `Acerto da festa de ${s.name || 'o atleta'} registrado.` };
+}
+
+export function unsettleParty(finance, id) {
+  const list = finance.partySettlements || [];
+  if (!list.some((x) => x.id === id)) throw new RuleError('Registro de acerto não encontrado.');
+  return { ...finance, partySettlements: list.filter((x) => x.id !== id) };
+}
+
+/**
+ * Atletas com extrato: cadastro atual + quem aparece em peladas, aportes ou acertos (inclusive excluídos
+ * do cadastro, para o dinheiro deles continuar conferível). Nome do cadastro tem prioridade.
+ */
+export function financeAthletes(players = [], sessions = [], finance = {}) {
+  const known = new Map(players.map((p) => [p.id, p.name]));
+  const add = (pid, name) => {
+    if (pid && !known.has(pid)) known.set(pid, name || '(atleta excluído)');
+  };
+  for (const r of attendanceRecords(sessions, finance).reverse()) add(r.pid, r.name);
+  for (const c of finance.contributions || []) add(c.pid, c.name);
+  for (const x of finance.partySettlements || []) add(x.pid, x.name);
+  return [...known].map(([id, name]) => ({ id, name, removed: !players.some((p) => p.id === id) }))
+    .sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'));
 }
 
 // ---------------------------------------------------------------- pagamentos do dia (RN-119)
@@ -337,11 +457,12 @@ export function paymentSummary(s) {
     .sort((a, b) => (a.type === b.type ? 0 : a.type === 'line' ? -1 : 1) || (a.method ? 1 : 0) - (b.method ? 1 : 0) || a.name.localeCompare(b.name, 'pt-BR'));
   const line = rows.filter((r) => r.type === 'line');
   const count = (m) => line.filter((r) => r.method === m).length;
-  const paid = count('pix') + count('card');
+  const paid = count('pix') + count('card') + count('cash');
   return {
     rows,
     pix: count('pix'),
     card: count('card'),
+    cash: count('cash'),
     exempt: count('exempt') + rows.filter((r) => r.type === 'gk').length,
     pending: line.filter((r) => !r.method).length,
     paid,
@@ -396,18 +517,29 @@ export function resetPreview(sessions = [], finance = {}) {
     started: countedPeladas(sessions).length,
     contributions: (finance.contributions || []).length,
     live: sessions.some((s) => s.status === 'live'),
+    draft: sessions.some((s) => s.status === 'draft'),
+    official: finance.mode === 'official',
   };
 }
 
+/** RN-127/RN-132: palavra exigida para zerar. No ciclo oficial ela é mais forte (apaga o histórico de verdade). */
+export function resetWord(finance = {}) {
+  return finance.mode === 'official' ? 'APAGAR TUDO' : 'ZERAR';
+}
+
 /**
- * RN-127: apaga peladas, presenças, pagamentos e aportes para começar o ciclo oficial do zero.
- * Mantém o cadastro de atletas e a configuração do Pix. Exige que nenhuma pelada esteja em andamento.
+ * RN-127/RN-132: apaga peladas, presenças, pagamentos, aportes e acertos para começar o ciclo oficial do zero.
+ * Mantém o cadastro de atletas e a configuração do Pix. Recusa com pelada em andamento ou sorteio em
+ * rascunho, e sem a palavra de confirmação correta.
  */
-export function resetCycle({ sessions = [], finance = {} }, now = new Date().toISOString()) {
+export function resetCycle({ sessions = [], finance = {}, confirm }, now = new Date().toISOString()) {
+  const word = resetWord(finance);
+  if (String(confirm ?? '').trim().toUpperCase() !== word) throw new RuleError(`Digite ${word} para confirmar.`);
   if (sessions.some((s) => s.status === 'live')) throw new RuleError('Encerre a pelada em andamento antes de zerar os lançamentos.');
+  if (sessions.some((s) => s.status === 'draft')) throw new RuleError('Há um sorteio em rascunho. Inicie ou descarte o rascunho antes de zerar.');
   return {
     sessions: [],
-    finance: { ...finance, contributions: [], mode: 'official', cycleStart: now, cycles: [] },
+    finance: { ...finance, contributions: [], partySettlements: [], mode: 'official', cycleStart: now, cycles: [] },
     removed: resetPreview(sessions, finance),
   };
 }

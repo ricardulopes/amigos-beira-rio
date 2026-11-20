@@ -1,6 +1,6 @@
 // Banco unificado (RN-113 a RN-117): o que muda, fila offline e mescla com a nuvem — sem rede.
 import { suite, test, assert } from './harness.js';
-import { emptyOutbox, outboxSize, diffDb, isEmptyDiff, addToOutbox, mergeRemote, rowToPlayer, playerToRow } from '../src/cloud/diff.js';
+import { emptyOutbox, outboxSize, diffDb, isEmptyDiff, addToOutbox, mergeRemote, mergeAppState, merge3, rowToPlayer, playerToRow } from '../src/cloud/diff.js';
 
 const pl = (id, name, stars = 2, positions = ['M']) => ({ id, name, stars, type: 'line', positions });
 const ses = (id, games = 0) => ({ id, title: id, status: 'live', games: Array.from({ length: games }, (_, n) => ({ n: n + 1 })) });
@@ -58,6 +58,45 @@ suite('Nuvem — diferenças e fila offline', () => {
   test('Pelada nova (nunca enviada) vai com versão-base 0', () => {
     const ob = addToOutbox(emptyOutbox(), { players: [], playersDeleted: [], peladas: ['nova'], peladasDeleted: [], appState: false }, {});
     assert.equal(ob.peladas.nova, 0);
+  });
+});
+
+suite('Nuvem — dois admins nas configurações (RN-133)', () => {
+  const st = (finance, setup = null) => ({ settings: { groupName: 'ABR', finance }, setup, activeSessionId: null });
+  const c = (id, cents) => ({ id, pid: 'g1', name: 'Goleiro', cents, note: '', at: '2027-03-01T10:00:00' });
+
+  test('A fila guarda a base das configurações só na primeira mudança pendente', () => {
+    const d = { players: [], playersDeleted: [], peladas: [], peladasDeleted: [], appState: true };
+    let ob = addToOutbox(emptyOutbox(), d, {}, st({ contributions: [] }));
+    ob = addToOutbox(ob, d, {}, st({ contributions: [c('x', 1)] }));
+    assert.deepEqual(ob.appStateBase.settings.finance.contributions, [], 'base = como estava antes da 1ª mudança offline');
+  });
+
+  test('Aporte do admin A não some quando o admin B (que estava sem sinal) envia as configurações dele', () => {
+    const base = st({ contributions: [c('c0', 1000)], cycles: [] }, { selected: ['a'] });
+    const remote = st({ contributions: [c('c0', 1000), c('cA', 5000)], cycles: [] }, { selected: ['a'] }); // A lançou R$ 50
+    const local = st({ contributions: [c('c0', 1000), c('cB', 3000)], cycles: [] }, { selected: ['a', 'b'] }); // B lançou R$ 30 e mexeu na seleção
+    const m = mergeAppState(base, local, remote);
+    assert.deepEqual(m.settings.finance.contributions.map((x) => x.id), ['c0', 'cA', 'cB'], 'os dois aportes ficam');
+    assert.deepEqual(m.setup.selected, ['a', 'b'], 'a mudança de B na seleção também fica');
+  });
+
+  test('Exclusão de aporte por um admin e encerramento de ciclo pelo outro sobrevivem à mescla', () => {
+    const open = { id: 'cy1', label: '1º semestre', start: '2027-01-01T00:00:00', end: null, resetCashback: true };
+    const base = st({ contributions: [c('c0', 1000), c('c1', 2000)], cycles: [open] });
+    const remote = st({ contributions: [c('c0', 1000), c('c1', 2000)], cycles: [{ ...open, end: '2027-06-30T00:00:00' }] }); // A encerrou
+    const local = st({ contributions: [c('c0', 1000)], cycles: [open] }); // B excluiu c1
+    const m = mergeAppState(base, local, remote);
+    assert.deepEqual(m.settings.finance.contributions.map((x) => x.id), ['c0']);
+    assert.equal(m.settings.finance.cycles[0].end, '2027-06-30T00:00:00', 'o encerramento do ciclo não é desfeito');
+    assert.equal(m.settings.groupName, 'ABR');
+  });
+
+  test('Sem base conhecida (fila antiga) envia o que está no aparelho, como antes', () => {
+    const local = st({ contributions: [] });
+    assert.equal(mergeAppState(null, local, st({ contributions: [c('z', 1)] })), local);
+    assert.equal(merge3(1, 2, 3), 2, 'conflito real no mesmo campo: vale quem está enviando');
+    assert.equal(merge3(1, 1, 3), 3, 'só a nuvem mudou: vale a nuvem');
   });
 });
 

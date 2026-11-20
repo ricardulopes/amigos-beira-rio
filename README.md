@@ -82,7 +82,8 @@ O app mostra o colete (dupla-face) de cada equipe em campo:
 Aba **Caixa** (💲 na barra de baixo). Está em **modo teste**: tudo já funciona e grava na nuvem, mas
 será zerado antes do ciclo oficial.
 - **Presença:** quem está na pelada ganha uma presença quando ela é **iniciada** (sorteio não iniciado não conta).
-- **Linha:** R$ 18 por pelada (R$ 15 operacional + R$ 3 de cashback). Cada presença soma **R$ 3** ao cashback.
+- **Linha:** R$ 18 por pelada (R$ 15 operacional + R$ 3 de cashback). Cada presença **paga** (Pix, Cartão ou
+  Dinheiro) soma **R$ 3** ao cashback; pendente ou Isento não soma (o crédito aparece quando o pagamento é marcado).
 - **Goleiros:** isentos da taxa; o cashback deles vem de **aportes livres** (ex.: R$ 30, R$ 50) lançados pelo admin.
 - **Festa (R$ 300):** o cashback abate a taxa; paga-se só a diferença. O cashback só zera quando o admin inicia
   um ciclo novo marcando "Zerar (novo ano da festa)".
@@ -91,12 +92,19 @@ será zerado antes do ciclo oficial.
 - **Ciclos manuais (admin, Ajustes → Financeiro e Pix):** **🏁 Encerrar ciclo/semestre atual** (fecha o ranking
   para o sorteio do campeonato) e **▶️ Iniciar novo ciclo/semestre** (ranking recomeça). Pedem para digitar
   ENCERRAR / INICIAR. Pelada feita na folga, entre o encerramento e o novo início, conta no próximo ciclo.
-- **Extrato (qualquer pessoa):** escolha seu nome e veja jogos, %, cashback, quanto falta para a festa e pendências.
+  Ao encerrar, o ranking fica **guardado (🔒)**: não muda mais, e as peladas desse ciclo não podem ser excluídas.
+  Encerrou por engano? **↩️ Reabrir último ciclo encerrado** (digitar REABRIR); se um ciclo novo já foi iniciado,
+  só dá enquanto ele estiver vazio.
+- **Extrato (qualquer pessoa):** escolha seu nome e veja jogos, %, cashback, quanto falta para a festa, pendências e
+  o cashback de todos os períodos anteriores. O admin registra ali o **acerto da festa** de cada período.
 - **Pix:** chave, "Copia e Cola" e QR Code da tesouraria, com botão de copiar (também no atalho 💠 da tela inicial).
-- **Admin (PIN mestre):** **Caixa do dia** (marcar Pix, Cartão ou Isento de cada atleta; atalho
+- **Admin (PIN mestre):** **Caixa do dia** (marcar Pix, Cartão, Dinheiro ou Isento de cada atleta; atalho
   "💰 Pagamentos" no sorteio e em "⋯ Mais" na partida), **Aportes** e, em **Ajustes → Financeiro e Pix**,
   configurar o Pix/QR Code e **🧹 Zerar lançamentos de teste** (apaga peladas, presenças, pagamentos e aportes;
-  mantém cadastro e Pix; pede para digitar ZERAR). Depois de zerar, começa o ciclo oficial.
+  mantém cadastro e Pix; pede para digitar ZERAR; recusa com pelada em andamento ou rascunho). Depois de zerar,
+  começa o ciclo oficial, e o botão vira **⚠️ Apagar todo o histórico**, que pede APAGAR TUDO.
+- **Dois admins ao mesmo tempo:** aportes, ciclos e acertos lançados por admins diferentes (mesmo um deles sem
+  sinal) são juntados, sem um apagar o do outro.
 
 ## Importar lista de atletas
 

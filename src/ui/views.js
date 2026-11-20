@@ -7,7 +7,7 @@ import {
   ADMIN_ACTIONS, PUBLIC_ACTIONS, allTeamsInOrder, queueLabel, teamStats, isComplete, linePositions, playerStats, balanceSummary, gamesSummary, teamExitGroups, drawHint, advantageStatus,
   vestOf, vestName, incomingVest,
   financeSettings, cyclesAvailable, cycleRanking, cycleList, NEXT_CYCLE, statement, paymentSummary, formatMoney, PAYMENT_METHODS, FINANCE_RULES,
-  groupCashback, attendanceRecords,
+  groupCashback, closedCycleOf, reopenInfo, financeAthletes,
 } from '../domain/index.js';
 
 export const CLUB_NAME = 'Amigos Beira Rio';
@@ -451,6 +451,7 @@ function rankingTab(f) {
     ${!cycles.some((x) => x.open) ? `<p class="alert warn small">${cyc.pending
     ? 'Estas peladas foram feitas na folga e entram no próximo ciclo quando um administrador iniciá-lo.'
     : 'Ciclo encerrado: este ranking está fechado para o sorteio do campeonato. Um administrador inicia o próximo ciclo em Ajustes → Financeiro e Pix.'}</p>` : ''}
+    ${r.frozen ? `<p class="small muted">🔒 Ranking guardado no encerramento (${dateShort(r.cycle.frozen.at)}): não muda mais.</p>` : ''}
     ${r.rows.length
     ? `<table class="tbl rank"><thead><tr><th class="num">#</th><th>Atleta</th><th class="num">Jogos</th><th class="num">%</th></tr></thead><tbody>${rows.join('')}</tbody></table>`
     : '<div class="card empty">Nenhuma presença neste ciclo ainda. Contam as peladas iniciadas no app.</div>'}
@@ -458,23 +459,36 @@ function rankingTab(f) {
     <p class="muted small">% = presenças ÷ jogos realizados no ciclo. O ranking recomeça quando um administrador inicia um novo ciclo; os ciclos encerrados continuam aqui para consulta. Toque num atleta para ver o extrato.</p>`;
 }
 
+/** Situação da festa num período + botão do admin para registrar/desfazer o acerto (RN-131). */
+function partyLine(pid, c, admin) {
+  const done = c.settlement;
+  const state = done
+    ? `✅ Acerto registrado em ${dateShort(done.at)}${done.note ? ` · ${esc(done.note)}` : ''}`
+    : c.partyPaid ? 'quitada com o cashback' : `faltava ${formatMoney(c.partyRemaining)}`;
+  const btn = !admin ? ''
+    : done ? `<button class="btn small ghost" data-act="party-unsettle" data-id="${esc(done.id)}">Desfazer acerto</button>`
+      : `<button class="btn small" data-act="party-settle" data-pid="${esc(pid)}" data-key="${esc(c.periodKey)}" data-cents="${c.total}" data-label="${esc(c.sinceLabel)}">Registrar acerto</button>`;
+  return `<li><div>Desde ${esc(c.sinceLabel)}: cashback <b>${formatMoney(c.total)}</b> — ${state}</div>${btn}</li>`;
+}
+
 function statementTab(f) {
   const pid = app.ui.stmtPid;
-  const known = new Map(app.db.players.map((p) => [p.id, p.name]));
-  for (const r of attendanceRecords(app.db.sessions)) if (!known.has(r.pid)) known.set(r.pid, r.name);
+  const athletes = financeAthletes(app.db.players, app.db.sessions, f);
+  const known = new Map(athletes.map((x) => [x.id, x.name]));
   if (!pid || !known.has(pid)) {
     const q = (app.ui.financeQuery || '').trim().toLowerCase();
-    const list = [...known].map(([id, name]) => ({ id, name })).filter((x) => !q || x.name.toLowerCase().includes(q)).sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'));
+    const list = athletes.filter((x) => !q || x.name.toLowerCase().includes(q));
     return `<p class="small">Escolha seu nome para ver jogos, cashback e quanto falta para a festa.</p>
       <input id="fsearch" class="search" type="search" placeholder="Pesquisar atleta" value="${esc(app.ui.financeQuery || '')}" data-input="fsearch" autocomplete="off">
-      <ul class="list">${list.map((x) => `<li class="row" data-act="stmt-pick" data-id="${esc(x.id)}"><div class="grow name">${esc(x.name)}</div><span class="chev">›</span></li>`).join('') || '<li class="empty-row">Nenhum atleta encontrado.</li>'}</ul>`;
+      <ul class="list">${list.map((x) => `<li class="row" data-act="stmt-pick" data-id="${esc(x.id)}"><div class="grow name">${esc(x.name)}${x.removed ? ' <span class="muted small">(fora do cadastro)</span>' : ''}</div><span class="chev">›</span></li>`).join('') || '<li class="empty-row">Nenhum atleta encontrado.</li>'}</ul>`;
   }
+  const admin = adminActive();
   const st = statement(pid, app.db.sessions, f);
   const c = st.cashback;
   const sem = st.cycle;
   const pay = (m) => (m ? PAYMENT_METHODS[m] : '<span class="warn-text">pendente</span>');
   const entries = st.entries.map((e) => e.kind === 'game'
-    ? `<li><span class="muted">${dateShort(e.date)}</span> ${esc(e.title)} · ${e.type === 'gk' ? '🧤 gol' : 'linha'} · ${pay(e.payment)}<b class="amt">${e.cents ? `+${formatMoney(e.cents)}` : '—'}</b></li>`
+    ? `<li><span class="muted">${dateShort(e.date)}</span> ${esc(e.title)} · ${e.type === 'gk' ? '🧤 gol' : 'linha'} · ${pay(e.payment)}<b class="amt">${e.cents ? `+${formatMoney(e.cents)}` : e.type === 'line' ? '<span class="muted small">sem cashback</span>' : '—'}</b></li>`
     : `<li><span class="muted">${dateShort(e.date)}</span> ${esc(e.title)}<b class="amt">+${formatMoney(e.cents)}</b></li>`).join('');
   return `<div class="card stmt">
       <div class="stmt-name"><b>${esc(known.get(pid))}</b><button class="btn small ghost" data-act="stmt-clear">Trocar</button></div>
@@ -484,16 +498,17 @@ function statementTab(f) {
         <div><b>${formatMoney(c.total).replace('R$ ', '')}</b><span>cashback (R$)</span></div>
       </div>
       <p class="small"><b>${esc(sem.label)}</b> · ${cyclePeriod(sem)} · ${sem.total} jogo(s) realizados.</p>
-      <p class="small">Cashback desde ${esc(c.sinceLabel)}: ${c.lineGames} presença(s) × ${formatMoney(FINANCE_RULES.cashbackPerGame)} = <b>${formatMoney(c.lineCents)}</b>${c.contribCents ? ` + aportes <b>${formatMoney(c.contribCents)}</b>` : ''}.</p>
-      <div class="party ${c.partyPaid ? 'paid' : ''}">🎉 Festa de fim de ano (${formatMoney(c.partyFee)}): ${c.partyPaid ? '<b>quitada com o cashback!</b>' : `falta <b>${formatMoney(c.partyRemaining)}</b>`}</div>
-      ${st.pending ? `<p class="alert warn small">${st.pending} pelada(s) sem pagamento registrado.</p>` : ''}
-      ${st.previousCashback ? `<p class="small muted">Período anterior (desde ${esc(st.previousCashback.sinceLabel)}): cashback de <b>${formatMoney(st.previousCashback.total)}</b>${st.previousCashback.partyPaid ? ' — festa quitada' : ` — faltava ${formatMoney(st.previousCashback.partyRemaining)} para a festa`}.</p>` : ''}
+      <p class="small">Cashback desde ${esc(c.sinceLabel)}: ${c.lineGames} presença(s) paga(s) × ${formatMoney(FINANCE_RULES.cashbackPerGame)} = <b>${formatMoney(c.lineCents)}</b>${c.contribCents ? ` + aportes <b>${formatMoney(c.contribCents)}</b>` : ''}.${c.uncredited ? ` <span class="warn-text">${c.uncredited} presença(s) sem pagamento quitado não gera(m) cashback.</span>` : ''}</p>
+      <div class="party ${c.partyPaid ? 'paid' : ''}">🎉 Festa de fim de ano (${formatMoney(c.partyFee)}): ${c.partyPaid ? '<b>quitada com o cashback!</b>' : `falta <b>${formatMoney(c.partyRemaining)}</b>`}${c.settlement ? ` · ✅ acerto registrado em ${dateShort(c.settlement.at)}` : ''}</div>
+      ${admin && (c.total || c.settlement) ? `<ul class="plain small party-hist">${partyLine(pid, c, admin)}</ul>` : ''}
+      ${st.pending ? `<p class="alert warn small">${st.pending} pelada(s) sem pagamento registrado (sem cashback até quitar).</p>` : ''}
+      ${st.previousCashbacks.length ? `<h3 class="small">Períodos anteriores (já zerados)</h3><ul class="plain small party-hist">${st.previousCashbacks.map((p) => partyLine(pid, p, admin)).join('')}</ul>` : ''}
       ${st.waiting ? `<p class="alert small">${st.waiting} lançamento(s) depois do encerramento do ciclo: entram no próximo ciclo quando ele for iniciado.</p>` : ''}
       <button class="btn primary wide" data-act="pix-open">💠 Pagar com Pix</button>
     </div>
     <h2 class="section-title">Lançamentos desde ${esc(c.sinceLabel)}</h2>
     ${entries ? `<ul class="plain small stmt-list">${entries}</ul>` : '<p class="muted">Nenhum lançamento neste período.</p>'}
-    <p class="muted small">Linha: ${formatMoney(FINANCE_RULES.lineFee)} por pelada (${formatMoney(FINANCE_RULES.operational)} operacional + ${formatMoney(FINANCE_RULES.cashbackPerGame)} de cashback). Goleiro: isento, cashback por aportes livres. O cashback só zera quando a tesouraria inicia um ciclo novo marcando "zerar cashback".</p>`;
+    <p class="muted small">Linha: ${formatMoney(FINANCE_RULES.lineFee)} por pelada (${formatMoney(FINANCE_RULES.operational)} operacional + ${formatMoney(FINANCE_RULES.cashbackPerGame)} de cashback, creditado quando a pelada é paga por Pix, Cartão ou Dinheiro). Goleiro: isento, cashback por aportes livres. O cashback só zera quando a tesouraria inicia um ciclo novo marcando "zerar cashback".</p>`;
 }
 
 /** Bloco do Pix da tesouraria (aba e janela rápida). */
@@ -522,15 +537,17 @@ function cashTab() {
     ? `<li class="pay-row"><span class="name">🧤 ${esc(r.name)}</span><span class="pill">Isento (goleiro)</span><button class="btn small" data-act="contrib-new" data-pid="${esc(r.pid)}">+ Aporte</button></li>`
     : `<li class="pay-row ${r.method ? '' : 'pending'}"><span class="name">${esc(r.name)}</span><div class="pay-chips">${Object.keys(PAYMENT_METHODS)
       .map((m) => `<button class="chip ${r.method === m ? 'on' : ''}" data-act="pay-set" data-sid="${esc(s.id)}" data-pid="${esc(r.pid)}" data-m="${r.method === m ? '' : m}">${PAYMENT_METHODS[m]}</button>`).join('')}</div></li>`);
+  const closed = closedCycleOf(s, financeSettings(app.db.settings));
   return `<div class="chips scroll-x">${chips}</div>
     <p class="small"><b>${esc(s.title)}</b>${s.status === 'draft' ? ' · <span class="warn-text">sorteio ainda não iniciado (a presença conta quando a pelada começa)</span>' : ''}</p>
+    ${closed ? `<p class="alert warn small">🔒 Pelada do ciclo "${esc(closed.label)}", já encerrado. Mudar um pagamento aqui altera o cashback desse período e pede confirmação.</p>` : ''}
     <section class="counters">
       <div><b>${p.pix}</b><span>Pix</span></div><div><b>${p.card}</b><span>Cartão</span></div>
-      <div><b>${p.pending}</b><span>pendentes</span></div><div><b>${p.exempt}</b><span>isentos</span></div>
+      <div><b>${p.cash}</b><span>Dinheiro</span></div><div><b>${p.pending}</b><span>pendentes</span></div>
     </section>
-    <p class="small">Recebido: <b>${formatMoney(p.collected)}</b> de ${formatMoney(p.expected)} · ${formatMoney(p.operational)} operacional + ${formatMoney(p.cashbackRetained)} de cashback.</p>
+    <p class="small">Recebido: <b>${formatMoney(p.collected)}</b> de ${formatMoney(p.expected)} · ${formatMoney(p.operational)} operacional + ${formatMoney(p.cashbackRetained)} de cashback · ${p.exempt} isento(s).</p>
     <ul class="list pay-list">${p.rows.map(row).join('')}</ul>
-    <p class="muted small">Toque de novo na forma marcada para voltar a "pendente". Cada presença de linha soma ${formatMoney(FINANCE_RULES.cashbackPerGame)} ao cashback do atleta.</p>`;
+    <p class="muted small">Toque de novo na forma marcada para voltar a "pendente". Só a pelada paga (Pix, Cartão ou Dinheiro) soma ${formatMoney(FINANCE_RULES.cashbackPerGame)} ao cashback; pendente e isento não somam.</p>`;
 }
 
 function contributionsTab(f) {
@@ -561,6 +578,7 @@ function financeSection() {
   const cycles = cycleList(f);
   const open = cycles.find((c) => c.open);
   const last = cycles[cycles.length - 1];
+  const reopen = reopenInfo(f, app.db.sessions);
   const cycleInfo = open
     ? `🟢 Ciclo aberto: <b>${esc(open.label)}</b> · ${cyclePeriod(open)}.`
     : `⏸ Nenhum ciclo aberto. Último: <b>${esc(last.label)}</b> (${cyclePeriod(last)}). Peladas da folga entram no próximo ciclo.`;
@@ -571,8 +589,11 @@ function financeSection() {
     ? `${open
       ? '<button class="btn wide" data-act="cycle-close">🏁 Encerrar ciclo/semestre atual</button>'
       : '<button class="btn primary wide" data-act="cycle-start">▶️ Iniciar novo ciclo/semestre</button>'}
+       ${reopen && !reopen.blocked ? `<button class="btn wide" data-act="cycle-reopen">↩️ Reabrir último ciclo encerrado (${esc(reopen.target.label)})</button>` : ''}
        <button class="btn wide" data-act="pix-edit">⚙️ Configurar Pix e QR Code</button>
-       <button class="btn danger-ghost wide" data-act="reset-open">🧹 Zerar lançamentos de teste</button>`
+       ${f.mode === 'official'
+    ? '<button class="btn danger-ghost wide" data-act="reset-open">⚠️ Apagar todo o histórico (recomeçar do zero)</button>'
+    : '<button class="btn danger-ghost wide" data-act="reset-open">🧹 Zerar lançamentos de teste</button>'}`
     : '<p class="muted small">Só administradores encerram/iniciam ciclos, configuram o Pix e zeram os lançamentos.</p>'}`;
 }
 

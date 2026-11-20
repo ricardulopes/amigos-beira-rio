@@ -253,6 +253,25 @@ begin
   where id = 1;
 end $$;
 
+-- RN-133: grava as configurações só se a versão da nuvem ainda for a que o aparelho leu e mesclou.
+-- Se outro admin gravou no meio, devolve conflito e o app lê, mescla de novo e tenta outra vez
+-- (assim um aporte ou um encerramento de ciclo feito por outro admin nunca é apagado sem aviso).
+create or replace function public.admin_save_app_state_v2(p_token uuid, p_settings jsonb, p_setup jsonb, p_active_id text, p_base_version integer)
+returns jsonb language plpgsql security definer set search_path = public, extensions as $$
+declare
+  cur integer;
+begin
+  perform _require_admin(p_token);
+  select version into cur from app_state where id = 1 for update;
+  if cur is not null and cur <> coalesce(p_base_version, 0) then
+    return jsonb_build_object('ok', false, 'conflict', true, 'version', cur);
+  end if;
+  update app_state set settings = coalesce(p_settings, '{}'::jsonb), setup = p_setup, active_pelada_id = p_active_id,
+    version = version + 1, updated_at = now()
+  where id = 1;
+  return jsonb_build_object('ok', true, 'version', coalesce(cur, 0) + 1);
+end $$;
+
 -- ------------------------------------------------------------------------------------- código do jogador (removido)
 
 -- Visitante só lê (RN-116, decisão de 2026-11-19): o código do jogador foi removido. Apaga o que
@@ -273,6 +292,7 @@ revoke all on function public.admin_delete_players(uuid, text[])                
 revoke all on function public.admin_save_pelada(uuid, jsonb, integer)                from public;
 revoke all on function public.admin_delete_pelada(uuid, text)                        from public;
 revoke all on function public.admin_save_app_state(uuid, jsonb, jsonb, text)         from public;
+revoke all on function public.admin_save_app_state_v2(uuid, jsonb, jsonb, text, integer) from public;
 
 grant execute on function public.admin_login(text)                              to anon, authenticated;
 grant execute on function public.admin_logout(uuid)                             to anon, authenticated;
@@ -282,6 +302,7 @@ grant execute on function public.admin_delete_players(uuid, text[])             
 grant execute on function public.admin_save_pelada(uuid, jsonb, integer)        to anon, authenticated;
 grant execute on function public.admin_delete_pelada(uuid, text)                to anon, authenticated;
 grant execute on function public.admin_save_app_state(uuid, jsonb, jsonb, text) to anon, authenticated;
+grant execute on function public.admin_save_app_state_v2(uuid, jsonb, jsonb, text, integer) to anon, authenticated;
 
 -- ------------------------------------------------------------------------------------- lista oficial (79)
 
