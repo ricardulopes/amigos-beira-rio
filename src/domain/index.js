@@ -29,7 +29,7 @@ export { assignRoles, tacticalDeviation, formationText } from './tactics.js';
 export { createRng } from './rng.js';
 export { drawTeams, planTeamSizes, exitGroups, optimizeOrder, orderCost, staggerPattern, incompleteTarget, assignGoalkeepers, WEIGHTS } from './draw.js';
 export { LIMITS, clampLinePerTeam, clampTolerance, clampTransferQty, planParticipation, goalkeeperNote, toleranceInfo, defaultTitle, prepareDraw,
-  goalkeeperOrder, moveInGoalkeeperOrder } from './setup.js';
+  goalkeeperOrder, moveInGoalkeeperOrder, goalkeeperPreview } from './setup.js';
 export {
   DEFAULT_CONFIG, RuleError, createSession, redraw, startSession, finishSession,
   teamPids, linePositions, positionOf, label, isComplete, queueLabel, player, teamStats, lineStarsRef, allTeamsInOrder, validate,

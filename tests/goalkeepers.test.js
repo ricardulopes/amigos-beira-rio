@@ -3,7 +3,7 @@ import { suite, test, assert } from './harness.js';
 import { mkSession, mkPlayer, lateSnap } from './helpers.js';
 import {
   prepareDraw, createSession, redraw, startSession, registerResult, addLatePlayer, removePlayer, moveGoalkeeperInLineup, validate,
-  goalkeeperOrder, moveInGoalkeeperOrder, goalkeeperLineup, goalkeeperNote, balanceSummary, shareText,
+  goalkeeperOrder, moveInGoalkeeperOrder, goalkeeperPreview, goalkeeperLineup, goalkeeperNote, balanceSummary, shareText,
   attendanceRecords, cycleCashback, setPayment, financeSettings, FIRST_CYCLE_ID,
 } from '../src/domain/index.js';
 
@@ -36,6 +36,11 @@ suite('Goleiros — chamada no sorteio e sorteio só de linha (RN-134)', () => {
     validate(s);
     const again = redraw(s, { draw: prepareDraw({ players, selectedIds: all, config: { linePerTeam: 3 }, seed: 9 }).draw });
     assert.deepEqual(goalkeeperLineup(again), ['gC', 'gA', 'gB'], 'novo sorteio mantém a ordem dos goleiros');
+  });
+
+  test('Prévia na chamada: 1º goleiro → Time 1, 2º → Time 2…; quem passa do número de times aguarda', () => {
+    assert.deepEqual(goalkeeperPreview(['a', 'b', 'c'], 2).map((x) => [x.position, x.team]), [[1, 1], [2, 2], [3, null]]);
+    assert.deepEqual(goalkeeperPreview([], 4), []);
   });
 
   test('Aviso dos goleiros', () => {

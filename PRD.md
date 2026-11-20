@@ -123,10 +123,13 @@ Pedido do dono em 2026-11-20 (revisado no mesmo dia: a primeira versão deixava 
 campo; o dono decidiu que os times da fila também recebem goleiro). **Substitui RN-19 a RN-21, RN-46, RN-60,
 RN-70 e RN-78 em toda pelada nova**; peladas criadas antes continuam com o modelo antigo (descrito abaixo).
 
-- **RN-134 — Goleiros fora da chamada e do sorteio.** A lista de presença mostra **só jogadores de linha** e o
-  sorteio é só de linha. Ao tocar em **Sortear**, abre a janela **"Ordem de chegada dos goleiros"** com os goleiros
-  cadastrados: o admin toca em quem veio, na ordem em que chegou (1º, 2º, 3º…), ajusta com ▲ ▼ / ✕ e confirma;
-  só então o sorteio é feito. A janela já vem com a ordem da última vez. "Novo sorteio" mantém a ordem. As opções
+- **RN-134 — Goleiros separados da chamada de linha e fora do sorteio.** No **topo** da tela de presença fica a
+  seção **"Ordem de chegada dos goleiros"** (separada da lista de linha): o admin toca nos goleiros cadastrados à
+  medida que chegam (1º, 2º, 3º…), ajusta com ▲ ▼ e desmarca com ✕; cada um mostra para qual time vai
+  (`goalkeeperPreview`). A lista de presença abaixo mostra **só jogadores de linha** ("Limpar" não desmarca
+  goleiros) e o sorteio é só de linha. Ao tocar em **Sortear** sem nenhum goleiro marcado, o app pergunta antes
+  ("Uai, nenhum goleiro foi marcado para hoje!…"), porque há dias sem goleiro. *(Revisado em 2026-11-20 a pedido
+  do dono: antes a chamada dos goleiros era uma janela aberta só ao sortear.)* "Novo sorteio" mantém a ordem. As opções
   "sortear com/sem goleiros" e "equipe só é completa com goleiro" foram removidas: equipe completa = N de linha.
 - **RN-135 — Um goleiro por time, pela ordem de chegada.** O 1º goleiro vai para o Time 1, o 2º para o Time 2,
   o 3º para o Time 3, e assim por diante, **inclusive times da fila**. Times sem goleiro ficam "aguardando goleiro".
@@ -704,7 +707,7 @@ Proteções da auditoria de ponto cego (pedido do dono em 2026-11-20):
 
 ---
 
-## 18. Testes automatizados (cobertura atual: 167 testes)
+## 18. Testes automatizados (cobertura atual: 168 testes)
 
 Executar em `tests/index.html` (navegador) ou `node tests/run-node.mjs`.
 

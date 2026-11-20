@@ -159,9 +159,9 @@ pilha de desfazer.
   completos, jogadores fora da formação desejada (tabela 2–15), e para a equipe incompleta com k atletas:
   soma próxima de **Alvo = M_time − (N − k) × M_atleta** (média dos completos menos as vagas que faltam
   preenchidas por atletas médios) + diversidade de posições (versatilidade se for 1 jogador).
-- Goleiros **não aparecem na chamada nem entram no sorteio** (só linha). Ao tocar em **Sortear**, abre a janela
-  **"Ordem de chegada dos goleiros"**: toque em quem veio, na ordem de chegada (▲ ▼ ajustam, ✕ tira), e confirme.
-  O 1º goleiro vai para o Time 1, o 2º para o Time 2, o 3º para o Time 3… inclusive times da fila; times sem
+- Goleiros **não entram no sorteio** (só linha). No **topo** da tela de presença fica a seção **"Ordem de chegada
+  dos goleiros"**: toque em cada goleiro à medida que chega (▲ ▼ ajustam, ✕ desmarca); abaixo vem a lista só de
+  linha. Se tocar em Sortear sem goleiro marcado, o app pergunta antes. O 1º goleiro vai para o Time 1, o 2º para o Time 2, o 3º para o Time 3… inclusive times da fila; times sem
   goleiro ficam "aguardando goleiro".
 - Ordem interna: escalonamento fixo por estrelas (posições de baixo para cima). Com 5: posição 5 = 1º
   melhor, 4 = pior, 3 = 3º, 2 = 4º, 1 = 2º melhor; mesmo padrão generalizado para 2 a 15 atletas e para a

@@ -65,6 +65,14 @@ export function goalkeeperOrder(players, selectedIds, gkOrder = []) {
   return out;
 }
 
+/**
+ * RN-135: para onde vai cada goleiro da ordem de chegada no sorteio — o 1º para o Time 1, o 2º para o Time 2…
+ * Quem passa do número de times aguarda time (team = null).
+ */
+export function goalkeeperPreview(order, teamCount) {
+  return order.map((pid, i) => ({ pid, position: i + 1, team: i < teamCount ? i + 1 : null }));
+}
+
 /** Sobe (delta = -1) ou desce (+1) um goleiro na ordem de chegada. Puro. */
 export function moveInGoalkeeperOrder(order, pid, delta) {
   const list = [...order];

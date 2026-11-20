@@ -384,34 +384,33 @@ const actions = {
     render();
   },
   'setup-none': () => {
-    setupState().selected = [];
+    // "Limpar" da lista de linha não desmarca os goleiros (eles têm a seção própria no topo)
+    const st = setupState();
+    st.selected = st.selected.filter((id) => app.db.players.find((p) => p.id === id)?.type === 'gk');
     save();
     render();
   },
-  // RN-134: chamada dos goleiros na hora do sorteio (quem veio e a ordem de chegada)
-  'gkc-add': (d) => {
-    const m = app.ui.modal;
-    if (!m.order.includes(d.pid)) m.order.push(d.pid);
-    render();
-  },
-  'gkc-del': (d) => {
-    const m = app.ui.modal;
-    m.order = m.order.filter((x) => x !== d.pid);
-    render();
-  },
-  'gkc-move': (d) => {
-    const m = app.ui.modal;
-    m.order = moveInGoalkeeperOrder(m.order, d.pid, Number(d.d));
-    render();
-  },
-  'gkc-ok': () => {
+  // RN-134: ordem de chegada dos goleiros, no topo da chamada (marcar, ordenar, desmarcar)
+  'gk-add': (d) => {
     const st = setupState();
-    const order = app.ui.modal.order;
-    const isGk = (id) => app.db.players.find((p) => p.id === id)?.type === 'gk';
-    st.selected = [...st.selected.filter((id) => !isGk(id)), ...order];
-    st.gkOrder = [...order];
-    closeModal();
-    doDraw();
+    const order = goalkeeperOrder(app.db.players, st.selected, st.gkOrder || []);
+    if (!st.selected.includes(d.pid)) st.selected.push(d.pid);
+    st.gkOrder = order.includes(d.pid) ? order : [...order, d.pid];
+    save();
+    render();
+  },
+  'gk-del': (d) => {
+    const st = setupState();
+    st.selected = st.selected.filter((id) => id !== d.pid);
+    st.gkOrder = (st.gkOrder || []).filter((id) => id !== d.pid);
+    save();
+    render();
+  },
+  'gk-order': (d) => {
+    const st = setupState();
+    st.gkOrder = moveInGoalkeeperOrder(goalkeeperOrder(app.db.players, st.selected, st.gkOrder || []), d.pid, Number(d.d));
+    save();
+    render();
   },
   'setup-n': (d) => {
     const c = setupState().config;
@@ -420,9 +419,19 @@ const actions = {
     render();
   },
   // RN-134: antes de sortear, a chamada dos goleiros (pré-marcados com a ordem da última vez)
+  // RN-134: sem goleiro marcado no topo, confirma antes de sortear (há dias sem goleiro)
   'do-draw': () => {
     const st = setupState();
-    openModal('gkCall', { order: goalkeeperOrder(app.db.players, st.selected, st.gkOrder || []), query: '' });
+    if (goalkeeperOrder(app.db.players, st.selected, st.gkOrder || []).length) return doDraw();
+    openModal('confirm', {
+      title: 'Sem goleiro hoje?',
+      text: 'Uai, nenhum goleiro foi marcado para hoje! Quer sortear assim mesmo? Os times ficam "aguardando goleiro" e quem chegar depois entra por "+ Atrasado".',
+      okText: 'Sortear sem goleiros',
+      onOk: () => {
+        closeModal();
+        doDraw();
+      },
+    });
   },
   redraw: () => {
     const s = activeSession();
