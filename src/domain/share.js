@@ -1,6 +1,6 @@
 // Texto para compartilhamento (WhatsApp).
 import { ROLE_SHORT } from './constants.js';
-import { allTeamsInOrder, queueLabel, teamStats, linePositions } from './session.js';
+import { allTeamsInOrder, queueLabel, teamStats, linePositions, usesGkQueue } from './session.js';
 import { starsText, formatStars } from './stars.js';
 import { vestOf, VESTS } from './vests.js';
 
@@ -28,7 +28,13 @@ export function shareText(s, { includeOrder = true, includeStars = true, include
       const exit = includeOrder && x.position === 1 ? ' ⬅ sai 1º' : '';
       lines.push(`${prefix}${p.name}${includeStars ? ` ${starsText(p.stars)}` : ''}${role}${exit}`);
     }
-    if (s.config.useGoalkeepers && !t.gks.length) lines.push('🧤 (sem goleiro)');
+    const needsGk = usesGkQueue(s) ? s.field.includes(t.id) : s.config.useGoalkeepers;
+    if (needsGk && !t.gks.length) lines.push('🧤 (sem goleiro)');
+  }
+  // RN-135: goleiros que aguardam a vez, em ordem.
+  if (usesGkQueue(s) && s.gkQueue.length) {
+    lines.push('');
+    lines.push(`🧤 *FILA DE GOLEIROS:* ${s.gkQueue.map((g, i) => `${i + 1}º ${s.snapshot[g].name}`).join(', ')}`);
   }
   if (includeOrder) {
     lines.push('');

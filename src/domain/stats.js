@@ -1,5 +1,5 @@
 // Estatísticas e resumos calculados a partir do estado da pelada (somente leitura).
-import { allTeamsInOrder, isComplete, teamStats, lineStarsRef } from './session.js';
+import { allTeamsInOrder, isComplete, teamStats, lineStarsRef, usesGkQueue } from './session.js';
 import { range, mean } from './stars.js';
 import { exitGroups, incompleteTarget } from './draw.js';
 
@@ -63,7 +63,10 @@ export function balanceSummary(s) {
     median: ref.median,
     mAthlete: ref.mean,
     forming,
-    withoutGk: s.config.useGoalkeepers ? teams.filter((t) => !t.gks.length).map((t) => t.label) : [],
+    // RN-135: na fila de goleiros, só as equipes em campo precisam de goleiro.
+    withoutGk: usesGkQueue(s)
+      ? s.field.filter((id) => !s.teams[id].gks.length).map((id) => s.teams[id].label)
+      : s.config.useGoalkeepers ? teams.filter((t) => !t.gks.length).map((t) => t.label) : [],
   };
 }
 

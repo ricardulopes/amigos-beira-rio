@@ -27,11 +27,12 @@ export const clampTransferQty = (v) => clamp(v, LIMITS.transferQty, 1);
  * @param {string[]} selectedIds presentes marcados
  * @param {{linePerTeam:number, useGoalkeepers:boolean}} config
  */
-export function planParticipation(players, selectedIds, config) {
+export function planParticipation(players, selectedIds, config, gkOrder = []) {
   const sel = new Set(selectedIds);
   const chosen = players.filter((p) => sel.has(p.id));
   const line = chosen.filter((p) => p.type === 'line');
-  const goalkeepers = chosen.filter((p) => p.type === 'gk');
+  const byId = new Map(players.map((p) => [p.id, p]));
+  const goalkeepers = goalkeeperOrder(players, selectedIds, gkOrder).map((id) => byId.get(id));
   const n = config.linePerTeam;
   const sizes = planTeamSizes(line.length, n);
   const fullCount = sizes.filter((x) => x === n).length;
@@ -47,17 +48,40 @@ export function planParticipation(players, selectedIds, config) {
     teamCount: sizes.length,
     fullCount,
     remainder,
-    goalkeeperNote: goalkeeperNote(config.useGoalkeepers, goalkeepers.length, sizes.length),
+    goalkeeperNote: goalkeeperNote(goalkeepers.length, sizes.length),
   };
 }
 
-/** Texto sobre a distribuição de goleiros prevista (RN-20). */
-export function goalkeeperNote(useGoalkeepers, gkCount, teamCount) {
-  if (!useGoalkeepers || !teamCount) return '';
-  if (gkCount === 0) return 'Nenhum goleiro presente.';
-  if (gkCount < teamCount) return `${gkCount} goleiro(s) para ${teamCount} equipes: ${teamCount - gkCount} ficará(ão) sem goleiro.`;
-  if (gkCount > teamCount) return `${gkCount - teamCount} goleiro(s) excedente(s) serão distribuídos de forma equilibrada.`;
-  return 'Um goleiro por equipe.';
+/**
+ * RN-134: ordem de chegada dos goleiros presentes. Usa a ordem definida pelo admin (`gkOrder`) e coloca
+ * no fim, na ordem em que foram marcados, os goleiros presentes que ainda não estão nela.
+ */
+export function goalkeeperOrder(players, selectedIds, gkOrder = []) {
+  const gk = new Set(players.filter((p) => p.type === 'gk').map((p) => p.id));
+  const sel = selectedIds.filter((id) => gk.has(id));
+  const present = new Set(sel);
+  const out = gkOrder.filter((id) => present.has(id));
+  for (const id of sel) if (!out.includes(id)) out.push(id);
+  return out;
+}
+
+/** Sobe (delta = -1) ou desce (+1) um goleiro na ordem de chegada. Puro. */
+export function moveInGoalkeeperOrder(order, pid, delta) {
+  const list = [...order];
+  const i = list.indexOf(pid);
+  const j = i + delta;
+  if (i < 0 || j < 0 || j >= list.length) return list;
+  [list[i], list[j]] = [list[j], list[i]];
+  return list;
+}
+
+/** Texto sobre os goleiros do dia (RN-135): os dois primeiros começam em campo; os demais aguardam. */
+export function goalkeeperNote(gkCount, teamCount) {
+  if (!teamCount) return '';
+  if (gkCount === 0) return 'Nenhum goleiro presente: os times jogam sem goleiro.';
+  if (gkCount === 1) return 'Só 1 goleiro: começa no gol do Time 1; o Time 2 fica sem goleiro.';
+  if (gkCount === 2) return 'O 1º goleiro começa no Time 1 e o 2º no Time 2.';
+  return `O 1º goleiro começa no Time 1 e o 2º no Time 2; ${gkCount - 2} aguarda(m) na fila de goleiros.`;
 }
 
 /**
@@ -83,22 +107,20 @@ export function defaultTitle(groupName, date = new Date()) {
  * @param {{players, selectedIds, config, settings, seed?}} p
  * @returns {{draw, snapshots, config, plan}}
  */
-export function prepareDraw({ players, selectedIds, config, settings = {}, seed }) {
-  const plan = planParticipation(players, selectedIds, config);
+export function prepareDraw({ players, selectedIds, config, settings = {}, seed, gkOrder = [] }) {
+  const plan = planParticipation(players, selectedIds, config, gkOrder);
   if (!plan.lineCount) throw new RuleError('Selecione jogadores de linha.');
   const finalConfig = {
     ...config,
+    // RN-134: as opções "sortear com/sem goleiros" e "só é completa com goleiro" saíram; goleiros sempre pela fila.
+    useGoalkeepers: true,
+    requireGkForComplete: false,
     linePerTeam: clampLinePerTeam(config.linePerTeam),
     toleranceMin: clampTolerance(settings.toleranceMin ?? DEFAULT_TOLERANCE_MIN),
     tossOnFirstGameEvenWithTwoWaiting: !!settings.tossOnFirstGameEvenWithTwoWaiting,
   };
   const snapshots = Object.fromEntries(plan.chosen.map((p) => [p.id, snapshotPlayer(p)]));
-  const draw = drawTeams({
-    line: plan.line,
-    goalkeepers: plan.goalkeepers,
-    linePerTeam: finalConfig.linePerTeam,
-    useGoalkeepers: finalConfig.useGoalkeepers,
-    seed,
-  });
-  return { draw, snapshots, config: finalConfig, plan };
+  // RN-134: o sorteio é estritamente de linha; goleiros nunca entram nele.
+  const draw = drawTeams({ line: plan.line, goalkeepers: [], linePerTeam: finalConfig.linePerTeam, useGoalkeepers: false, seed });
+  return { draw, snapshots, config: finalConfig, plan, gkOrder: plan.goalkeepers.map((p) => p.id) };
 }

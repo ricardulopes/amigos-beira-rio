@@ -7,7 +7,8 @@ import { esc } from './dom.js';
 import {
   validatePlayer, snapshotPlayer, playerDraft, togglePosition, prepareDraw, clampLinePerTeam, clampTolerance, clampTransferQty,
   createSession, redraw, startSession, finishSession, analyzeResult, registerResult, addLatePlayer, removePlayer,
-  transferPlayers, movePlayerInOrder, swapPlayers, moveGoalkeeper, setPermanence, RuleError,
+  transferPlayers, movePlayerInOrder, swapPlayers, moveGoalkeeper, moveGoalkeeperInLineup, setPermanence, RuleError,
+  goalkeeperOrder, moveInGoalkeeperOrder, goalkeeperLineup,
   shareText, validatePinFormat, parseRoster, planRosterImport, applyRosterImport, rosterPlanSummary,
   rosterText, financeSettings, setPayment, addContribution, removeContribution, setPixConfig, setPixQr, resetCycle, QR_MAX_CHARS, formatMoney,
   currentCycle, closeCycle, startCycle, suggestCycleLabel, reopenCycle, closedCycleOf, assertSessionDeletable, settleParty, unsettleParty,
@@ -144,7 +145,7 @@ const FREE_ACTIONS = new Set([
 ]);
 
 /** Ajustes e seleção de presentes (campos de formulário) também são do administrador. */
-const ADMIN_FIELDS = new Set(['stitle', 'ssched', 'setup-gk', 'setup-reqgk', 'set-group', 'set-tol', 'set-n', 'set-gk', 'set-reqgk', 'set-toss', 'import', 'pix-qr']);
+const ADMIN_FIELDS = new Set(['stitle', 'ssched', 'set-group', 'set-tol', 'set-n', 'set-toss', 'import', 'pix-qr']);
 
 // ------------------------------------------------------------------ financeiro (RN-118 a RN-127)
 
@@ -385,6 +386,13 @@ const actions = {
     save();
     render();
   },
+  // RN-134: ordem de chegada dos goleiros presentes (1º, 2º, 3º…)
+  'gk-order': (d) => {
+    const st = setupState();
+    st.gkOrder = moveInGoalkeeperOrder(goalkeeperOrder(app.db.players, st.selected, st.gkOrder || []), d.pid, Number(d.d));
+    save();
+    render();
+  },
   'setup-n': (d) => {
     const c = setupState().config;
     c.linePerTeam = clampLinePerTeam(c.linePerTeam + Number(d.d));
@@ -396,7 +404,8 @@ const actions = {
     const s = activeSession();
     const st = setupState();
     st.selected = [...s.active];
-    st.config = { linePerTeam: s.config.linePerTeam, useGoalkeepers: s.config.useGoalkeepers, requireGkForComplete: s.config.requireGkForComplete };
+    st.gkOrder = goalkeeperLineup(s); // novo sorteio mantém a ordem dos goleiros
+    st.config = { linePerTeam: s.config.linePerTeam };
     doDraw();
   },
   'discard-draft': () =>
@@ -508,6 +517,7 @@ const actions = {
   },
   'open-gk': () => openModal('gk', {}),
   'gk-move': (d) => exec('Goleiro', (s) => moveGoalkeeper(s, d.pid, d.t || null), { silent: true }),
+  'gk-line': (d) => exec('Goleiro', (s) => moveGoalkeeperInLineup(s, d.pid, d.to === 'end' ? 'end' : Number(d.to)), { silent: true }),
   'open-log': () => openModal('log', {}),
   'open-more': () => openModal('more', {}),
   perm: (d) => {
@@ -849,15 +859,17 @@ function doDraw() {
   const title = st.title.trim() || defaultTitle();
   try {
     const t0 = performance.now();
-    const { draw, snapshots, config } = prepareDraw({ players: app.db.players, selectedIds: st.selected, config: st.config, settings: app.db.settings });
+    const { draw, snapshots, config, gkOrder } = prepareDraw({
+      players: app.db.players, selectedIds: st.selected, config: st.config, settings: app.db.settings, gkOrder: st.gkOrder || [],
+    });
     const ms = Math.round(performance.now() - t0);
     if (current && current.status === 'draft') {
-      const next = redraw(current, { draw, config, snapshots });
+      const next = redraw(current, { draw, config, snapshots, gkOrder });
       next.title = title;
       store.pushUndo(current.id, 'Sorteio', current);
       replaceSession(next);
     } else {
-      const s = createSession({ title, config, snapshots, draw, scheduledAt: st.scheduled || null });
+      const s = createSession({ title, config, snapshots, draw, gkOrder, scheduledAt: st.scheduled || null });
       app.db.sessions.push(s);
       app.db.activeSessionId = s.id;
     }
@@ -931,12 +943,6 @@ document.addEventListener('change', async (ev) => {
   const st = app.db.settings;
   const setup = setupState();
   switch (key) {
-    case 'setup-gk':
-      setup.config.useGoalkeepers = el.checked;
-      break;
-    case 'setup-reqgk':
-      setup.config.requireGkForComplete = el.checked;
-      break;
     case 'set-group':
       st.groupName = el.value.trim() || 'Pelada';
       break;
@@ -946,14 +952,6 @@ document.addEventListener('change', async (ev) => {
     case 'set-n':
       st.linePerTeam = clampLinePerTeam(el.value);
       setup.config.linePerTeam = st.linePerTeam;
-      break;
-    case 'set-gk':
-      st.useGoalkeepers = el.checked;
-      setup.config.useGoalkeepers = el.checked;
-      break;
-    case 'set-reqgk':
-      st.requireGkForComplete = el.checked;
-      setup.config.requireGkForComplete = el.checked;
       break;
     case 'set-toss': {
       st.tossOnFirstGameEvenWithTwoWaiting = el.checked;

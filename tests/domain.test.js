@@ -55,7 +55,7 @@ suite('Preparação da pelada (setup.js)', () => {
     assert.deepEqual(p.sizes, [5, 5, 5, 5, 1]);
     assert.equal(p.fullCount, 4);
     assert.equal(p.remainder, 1);
-    assert.ok(p.goalkeeperNote.includes('2 ficará(ão) sem goleiro'));
+    assert.ok(p.goalkeeperNote.includes('1 aguarda(m) na fila de goleiros'), 'RN-135: 2 em campo, 1 na fila');
   });
 
   test('Seleção não altera o cadastro e ignora ids desconhecidos', () => {
@@ -65,11 +65,11 @@ suite('Preparação da pelada (setup.js)', () => {
     assert.equal(JSON.stringify(players), before);
   });
 
-  test('Aviso de goleiros (RN-20)', () => {
-    assert.equal(goalkeeperNote(false, 0, 4), '');
-    assert.equal(goalkeeperNote(true, 0, 4), 'Nenhum goleiro presente.');
-    assert.equal(goalkeeperNote(true, 4, 4), 'Um goleiro por equipe.');
-    assert.ok(goalkeeperNote(true, 6, 4).startsWith('2 goleiro(s) excedente'));
+  test('Aviso de goleiros (RN-135)', () => {
+    assert.equal(goalkeeperNote(2, 0), '');
+    assert.equal(goalkeeperNote(0, 4), 'Nenhum goleiro presente: os times jogam sem goleiro.');
+    assert.equal(goalkeeperNote(2, 4), 'O 1º goleiro começa no Time 1 e o 2º no Time 2.');
+    assert.ok(goalkeeperNote(6, 4).endsWith('4 aguarda(m) na fila de goleiros.'));
   });
 
   test('Tolerância: horário recomendado e contagem regressiva (RN-11)', () => {
@@ -104,7 +104,8 @@ suite('Preparação da pelada (setup.js)', () => {
     assert.equal(r.config.toleranceMin, 15);
     assert.equal(r.config.tossOnFirstGameEvenWithTwoWaiting, true);
     assert.equal(r.draw.teams.length, 5);
-    assert.deepEqual(r.draw.withoutGk, [3, 4]);
+    assert.ok(r.draw.teams.every((t) => !t.gks.length), 'RN-134: goleiros fora do sorteio de linha');
+    assert.equal(r.gkOrder.length, 3, 'os 3 goleiros vão para a ordem de chegada');
     r.snapshots.l0.stars = 3;
     assert.equal(players[0].stars, 2, 'snapshot é cópia, não referência');
   });

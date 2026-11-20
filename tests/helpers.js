@@ -12,8 +12,10 @@ export function mkPlayer(over = {}) {
  * Cria uma sessão com times de tamanhos definidos, sem passar pelo otimizador
  * (para testar regras de rodízio de forma determinística).
  * sizes: [5,5,5,2] → Time 1..4 com esses tamanhos de linha.
+ * goalkeepers: k → k goleiros (G1..Gk) em ordem de chegada, pela fila de goleiros (RN-134 a RN-137).
+ * gks: [1,0,…] → modelo ANTIGO (pelada anterior a 2026-11-20): goleiros presos às equipes, sem fila.
  */
-export function mkSession(sizes, { n = 5, gks = [], config = {}, stars } = {}) {
+export function mkSession(sizes, { n = 5, gks = [], goalkeepers = 0, config = {}, stars } = {}) {
   const snapshots = {};
   const teams = sizes.map((size, ti) => {
     const line = [];
@@ -31,7 +33,19 @@ export function mkSession(sizes, { n = 5, gks = [], config = {}, stars } = {}) {
     return { line, gks: g };
   });
   const draw = { teams, seed: 1, metrics: {}, ref: 2, withoutGk: [], unusedGoalkeepers: [] };
-  const s = createSession({ title: 'Teste', config: { linePerTeam: n, ...config }, snapshots, draw });
+  const gkOrder = [];
+  for (let k = 1; k <= goalkeepers; k++) {
+    const gk = mkPlayer({ id: `G${k}`, name: `Goleiro ${k}`, type: 'gk', positions: [] });
+    snapshots[gk.id] = gk;
+    gkOrder.push(gk.id);
+  }
+  const s = createSession({ title: 'Teste', config: { linePerTeam: n, ...config }, snapshots, draw, gkOrder });
+  if (gks.some(Boolean)) {
+    // modelo antigo: goleiros presos às equipes (para testar peladas antigas)
+    delete s.gkQueue;
+    teams.forEach((t, i) => (s.teams[`t${i + 1}`].gks = [...t.gks]));
+    s.active.push(...teams.flatMap((t) => t.gks));
+  }
   s.status = 'live';
   return s;
 }

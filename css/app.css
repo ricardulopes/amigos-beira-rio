@@ -315,6 +315,10 @@ code { font: 13px ui-monospace, Consolas, monospace; background: var(--surface-2
 .prow { display: flex; align-items: center; gap: 8px; padding: 6px 0; border-top: 1px dashed var(--line); min-height: 38px; }
 .prow .ord { width: 22px; text-align: center; font-weight: 800; color: var(--muted); font-size: 13px; flex: none; }
 .prow .pname { flex: 1; min-width: 0; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* Goleiros do dia (RN-134/RN-137): nome em cima, onde está embaixo */
+.prow .gk-who { flex: 1; min-width: 0; }
+.prow .gk-who .pname { display: block; }
+.gk-queue { margin: 8px 0 0; }
 .gkrow .pname { color: var(--G); }
 .gkrow.missing .pname { color: var(--warn); font-style: italic; }
 .exit { font-size: 11px; font-weight: 900; padding: 2px 5px; border-radius: 6px; flex: none; }

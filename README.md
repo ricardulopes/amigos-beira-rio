@@ -84,7 +84,8 @@ será zerado antes do ciclo oficial.
 - **Presença:** quem está na pelada ganha uma presença quando ela é **iniciada** (sorteio não iniciado não conta).
 - **Linha:** R$ 18 por pelada (R$ 15 operacional + R$ 3 de cashback). Cada presença **paga** (Pix, Cartão ou
   Dinheiro) soma **R$ 3** ao cashback; pendente ou Isento não soma (o crédito aparece quando o pagamento é marcado).
-- **Goleiros:** isentos da taxa; o cashback deles vem de **aportes livres** (ex.: R$ 30, R$ 50) lançados pelo admin.
+- **Goleiros:** contam presença (ranking Top 4), são isentos da taxa e **nunca** geram os R$ 3 automáticos; o
+  cashback deles vem só de **aportes livres** (ex.: R$ 30, R$ 50) lançados pelo admin.
 - **Festa (R$ 300):** o cashback abate a taxa; paga-se só a diferença. O cashback só zera quando o admin inicia
   um ciclo novo marcando "Zerar (novo ano da festa)".
 - **Ranking de Linha** (Top 32 com vaga prioritária) e **Goleiros** (Top 4), por **ciclo/semestre**, com % sobre os
@@ -158,8 +159,9 @@ pilha de desfazer.
   completos, jogadores fora da formação desejada (tabela 2–15), e para a equipe incompleta com k atletas:
   soma próxima de **Alvo = M_time − (N − k) × M_atleta** (média dos completos menos as vagas que faltam
   preenchidas por atletas médios) + diversidade de posições (versatilidade se for 1 jogador).
-- Goleiros: um por equipe (prioridade para as primeiras da fila), goleiro mais forte para o time de
-  linha mais fraco; excedentes para as equipes mais fracas; aviso de quais ficam sem goleiro.
+- Goleiros **não entram no sorteio** (só linha). Na tela de presença, os goleiros marcados aparecem na
+  **ordem de chegada** (1º, 2º, 3º…, ajustável com ▲ ▼): o 1º começa no gol do Time 1, o 2º no do Time 2 e os
+  demais aguardam na **fila de goleiros**.
 - Ordem interna: escalonamento fixo por estrelas (posições de baixo para cima). Com 5: posição 5 = 1º
   melhor, 4 = pior, 3 = 3º, 2 = 4º, 1 = 2º melhor; mesmo padrão generalizado para 2 a 15 atletas e para a
   equipe incompleta. Os mais fortes nunca ficam vizinhos.
@@ -177,8 +179,13 @@ pilha de desfazer.
   permanências por empate, vitórias no par ou ímpar.
 - Ao ir para o fim da fila, se a última equipe estiver incompleta, o time que saiu a completa
   **de baixo para cima** (preservando a sequência); o restante forma nova equipe. Não divide se não
-  houver vagas. O goleiro acompanha o bloco se a equipe completada estiver sem goleiro.
-- "Completa" = N jogadores de linha (+ goleiro se a opção "equipe só é completa com goleiro" estiver ligada).
+  houver vagas.
+- "Completa" = N jogadores de linha.
+- **Goleiros (rodízio próprio):** só os dois times em campo têm goleiro. Quem fica em campo mantém o
+  goleiro; o goleiro de quem sai vai para o **fim da fila de goleiros** e o 1º da fila assume o time que
+  entra (empate segue a regra dos times; na saída dupla, os dois goleiros vão para a fila). Com 5 times e
+  3 goleiros, a fila de goleiros gira sozinha. Os cards em campo mostram o goleiro de cada time e a tela da
+  partida mostra a fila de goleiros (🧤 Goleiros → ▲ ▼ para mudar a ordem, ⤓ para mandar ao fim da fila).
 
 ### Conflito resolvido
 "Par ou ímpar no primeiro jogo" × "PRO e RE completos: saem os dois, regra absoluta". Como a seção 18
@@ -188,12 +195,13 @@ mesmo com PRO e RE completos**.
 
 ### Outras decisões
 - Atrasado de linha entra na base da última equipe da fila se houver vaga; senão abre nova equipe.
-  Goleiro atrasado vai para a primeira equipe (PRO, RE…, depois campo) sem goleiro.
+  Goleiro atrasado vai para o fim da fila de goleiros (assume na hora se um time em campo estiver sem goleiro).
 - Saída por lesão, cansaço ou desistência: a vaga é reposta **automaticamente**, na mesma esteira de
   "subir a lista" do rodízio. A posição 1 do Próximo entra no topo do time que perdeu o jogador; a
   posição 1 do Ré vai para o topo do Próximo; a do Tri vai para o Ré, e assim por diante. A vaga termina
-  no último time da fila. Se alguém da fila desiste, só os times de trás sobem. Goleiro é reposto pelo
-  próximo goleiro da fila. Nenhuma escolha manual; dá para desfazer.
+  no último time da fila. Se alguém da fila desiste, só os times de trás sobem. Goleiro em campo é reposto
+  na hora pelo 1º da fila de goleiros (sem ninguém esperando, o time fica sem goleiro). Nenhuma escolha
+  manual; dá para desfazer.
 - Editar o cadastro nunca altera peladas anteriores (cada pelada guarda um snapshot dos jogadores).
 
 ## Previsto para o futuro

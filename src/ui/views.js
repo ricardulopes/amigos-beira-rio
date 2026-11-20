@@ -7,7 +7,7 @@ import {
   ADMIN_ACTIONS, PUBLIC_ACTIONS, allTeamsInOrder, queueLabel, teamStats, isComplete, linePositions, playerStats, balanceSummary, gamesSummary, teamExitGroups, drawHint, advantageStatus,
   vestOf, vestName, incomingVest,
   financeSettings, cyclesAvailable, cycleRanking, cycleList, NEXT_CYCLE, statement, paymentSummary, formatMoney, PAYMENT_METHODS, FINANCE_RULES,
-  groupCashback, closedCycleOf, reopenInfo, financeAthletes,
+  groupCashback, closedCycleOf, reopenInfo, financeAthletes, usesGkQueue,
 } from '../domain/index.js';
 
 export const CLUB_NAME = 'Amigos Beira Rio';
@@ -115,8 +115,14 @@ export function setupView() {
   const sel = new Set(st.selected.filter((id) => app.db.players.some((p) => p.id === id)));
   const players = filterPlayers(app.db.players, { query: app.ui.setupQuery });
   const n = st.config.linePerTeam;
-  const plan = planParticipation(app.db.players, [...sel], st.config);
+  const plan = planParticipation(app.db.players, st.selected.filter((id) => sel.has(id)), st.config, st.gkOrder || []);
   const { lineCount: nLine, gkCount: nGk, total, teamCount, fullCount: full, remainder: rem, goalkeeperNote: gkText } = plan;
+  // RN-134: ordem de chegada dos goleiros do dia (o admin ajusta com ▲ ▼)
+  const gkRows = plan.goalkeepers.map((p, i, all) => `<li class="prow">
+      <span class="ord pos">${i + 1}º</span><div class="grow gk-who"><div class="pname">🧤 ${esc(p.name)}</div>
+      <div class="muted small">${i === 0 ? 'começa no gol do Time 1' : i === 1 ? 'começa no gol do Time 2' : `${i - 1}º da fila de goleiros`}</div></div>
+      <button class="mini" data-act="gk-order" data-pid="${esc(p.id)}" data-d="-1" ${i === 0 ? 'disabled' : ''} aria-label="Chegou antes">▲</button>
+      <button class="mini" data-act="gk-order" data-pid="${esc(p.id)}" data-d="1" ${i === all.length - 1 ? 'disabled' : ''} aria-label="Chegou depois">▼</button></li>`).join('');
   const s = activeSession();
   const tol = app.db.settings.toleranceMin;
   const ti = toleranceInfo(st.scheduled, tol);
@@ -140,8 +146,6 @@ export function setupView() {
         </div>
       </div>
       ${tolText ? `<p class="muted small">${tolText}</p>` : ''}
-      <label class="switch"><input type="checkbox" data-change="setup-gk" ${st.config.useGoalkeepers ? 'checked' : ''}><span>Sortear com goleiros</span></label>
-      <label class="switch ${st.config.useGoalkeepers ? '' : 'disabled'}"><input type="checkbox" data-change="setup-reqgk" ${st.config.requireGkForComplete ? 'checked' : ''} ${st.config.useGoalkeepers ? '' : 'disabled'}><span>Equipe só é completa com goleiro</span></label>
     </section>
 
     <section class="counters">
@@ -151,6 +155,11 @@ export function setupView() {
       <div><b>${teamCount}</b><span>equipes</span></div>
     </section>
     <p class="plan-text">${nLine ? `${full} equipe(s) completa(s) de ${n}${rem ? ` + 1 em formação com ${rem}` : ''}.` : 'Marque os jogadores presentes.'} ${gkText}</p>
+    ${nGk ? `<section class="card gk-order">
+      <h3 class="small">🧤 Goleiros do dia — ordem de chegada</h3>
+      <ul class="plist editable">${gkRows}</ul>
+      <p class="muted small">Goleiros não entram no sorteio. O 1º começa no gol do Time 1, o 2º no do Time 2 e os demais aguardam na fila de goleiros. Quem perde sai e o goleiro dele vai para o fim da fila.</p>
+    </section>` : ''}
 
     <div class="list-head">
       <input id="ssearch" class="search" type="search" placeholder="Buscar presente" value="${esc(app.ui.setupQuery)}" data-input="ssearch" autocomplete="off">
@@ -206,7 +215,9 @@ export function teamCard(s, team, { compact = false, dense = false, showOrder = 
   const n = s.config.linePerTeam;
   const rows = positionedRows(s, team, (p, x) => playerRow(p, x, showOrder));
   const gks = team.gks.map((g) => `<li class="prow gkrow"><span class="ord">🧤</span><span class="pname">${esc(s.snapshot[g].name)}</span><span class="role role-G">GOL</span>${stars(s.snapshot[g].stars, 'sm')}</li>`).join('');
-  const noGk = s.config.useGoalkeepers && !team.gks.length ? `<li class="prow gkrow missing"><span class="ord">🧤</span><span class="pname">sem goleiro</span></li>` : '';
+  // RN-135: na fila de goleiros, só time em campo tem (ou precisa de) goleiro.
+  const needsGk = usesGkQueue(s) ? s.field.includes(team.id) : s.config.useGoalkeepers;
+  const noGk = needsGk && !team.gks.length ? `<li class="prow gkrow missing"><span class="ord">🧤</span><span class="pname">sem goleiro</span></li>` : '';
   const perm = permPill(s, team);
   if (dense) {
     const letter = { D: 'D', M: 'M', A: 'A' };
@@ -250,6 +261,14 @@ export function teamCard(s, team, { compact = false, dense = false, showOrder = 
   </article>`;
 }
 
+/** RN-135: goleiros aguardando a vez, em ordem (o 1º assume o próximo time que entrar em campo). */
+function gkQueueLine(s) {
+  if (!usesGkQueue(s)) return '';
+  const list = s.gkQueue.map((g, i) => `<b>${i + 1}º</b> ${esc(s.snapshot[g].name)}`).join(' · ');
+  return `<p class="small gk-queue">🧤 Fila de goleiros: ${list || '<span class="muted">ninguém aguardando</span>'}
+    <button class="link" data-act="open-gk">ajustar</button></p>`;
+}
+
 function exitSummary(s, team) {
   const groups = teamExitGroups(s, team);
   if (!groups.length) return '';
@@ -276,6 +295,7 @@ export function draftView(s) {
       ${sum.forming ? `<p class="small forming-line">Em formação (${esc(sum.forming.label)}, ${sum.forming.size} atleta(s)): <b>${fmt(sum.forming.sum)}★</b> · alvo <b>${fmt(sum.forming.target)}★</b>
         <span class="muted">= ${fmt(sum.forming.mTime)}★ dos completos − ${sum.forming.missing} vaga(s) × ${fmt(sum.forming.mAthlete.toFixed(2))}★ de média</span></p>` : ''}
       ${noGk.length ? `<div class="alert warn small">Sem goleiro: ${noGk.map(esc).join(', ')}.</div>` : ''}
+      ${gkQueueLine(s)}
       ${s.bench.length ? `<div class="alert small">Goleiros fora do sorteio: ${s.bench.map((g) => esc(s.snapshot[g].name)).join(', ')}.</div>` : ''}
       <p class="muted small">Posições numeradas de baixo para cima: a <span class="ord pos e1">1</span> é a base e sai primeiro se o time perder; quem chega ocupa a próxima posição livre acima. As duas primeiras equipes começam — a 1ª de colete <b>Amarelo</b> e a 2ª de <b>Azul</b>; as demais formam a fila.</p>
     </section>
@@ -317,6 +337,7 @@ export function liveView(s) {
         ${teamCard(s, a, { dense: true })}
         ${teamCard(s, b, { dense: true })}
       </div>
+      ${gkQueueLine(s)}
       <p class="muted tiny">${esc(drawHint(s))}</p>
     </section>` : `<div class="alert warn">É preciso ter duas equipes para jogar. Adicione atrasados ou faça transferências.</div>`}
     <div class="quick">
@@ -390,7 +411,7 @@ export function historyDetailView(id) {
     const late = Object.fromEntries(s.arrivals.map((a) => [a.pid, a.order]));
     const removed = Object.fromEntries(s.removed.map((r) => [r.pid, r]));
     body = `<p class="muted small">Dados como estavam no momento da pelada (alterações posteriores no cadastro não afetam este registro).</p>
-    <p class="small">Configuração: ${s.config.linePerTeam} na linha · ${s.config.useGoalkeepers ? 'com goleiros' : 'sem goleiros'}${s.config.requireGkForComplete ? ' · goleiro obrigatório' : ''}</p>
+    <p class="small">Configuração: ${s.config.linePerTeam} na linha · ${usesGkQueue(s) ? 'goleiros pela fila de chegada' : `${s.config.useGoalkeepers ? 'com goleiros' : 'sem goleiros'}${s.config.requireGkForComplete ? ' · goleiro obrigatório' : ''}`}</p>
     <ul class="list">${ps.map((p) => `<li class="row"><div class="grow"><div class="name">${esc(p.name)}</div><div class="badges">${positionsBadges(p)}
       ${late[p.id] ? `<span class="pill">${late[p.id]}º atrasado</span>` : ''}
       ${removed[p.id] ? `<span class="pill warn">${esc(REMOVAL_REASONS[removed[p.id].reason] || '')}</span>` : ''}</div></div>${stars(p.stars)}</li>`).join('')}</ul>`;
@@ -617,8 +638,6 @@ export function settingsView() {
         <label class="field"><span>Tolerância (min)</span><input type="number" min="0" max="120" inputmode="numeric" data-change="set-tol" value="${st.toleranceMin}"></label>
         <label class="field"><span>Linha por time</span><input type="number" min="${LIMITS.linePerTeam.min}" max="${LIMITS.linePerTeam.max}" inputmode="numeric" data-change="set-n" value="${st.linePerTeam}"></label>
       </div>
-      <label class="switch"><input type="checkbox" data-change="set-gk" ${st.useGoalkeepers ? 'checked' : ''}><span>Sortear com goleiros</span></label>
-      <label class="switch"><input type="checkbox" data-change="set-reqgk" ${st.requireGkForComplete ? 'checked' : ''}><span>Equipe só é completa com goleiro</span></label>
       <label class="switch"><input type="checkbox" data-change="set-toss" ${st.tossOnFirstGameEvenWithTwoWaiting ? 'checked' : ''}><span>Par ou ímpar no 1º jogo mesmo com PRO e RE completos</span></label>
       <p class="muted small">Por padrão, a regra de saída dupla (PRO e RE completos) prevalece sobre o par ou ímpar do primeiro jogo.</p>
     </section>

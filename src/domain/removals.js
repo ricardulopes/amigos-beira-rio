@@ -1,6 +1,6 @@
 // Lesões, saídas antecipadas e reposição automática em cascata (PRD seção 11).
 import { REMOVAL_REASONS } from './constants.js';
-import { RuleError, transact, nowIso, allTeamsInOrder, refreshRoles, removeTeam, fillField, addLog } from './session.js';
+import { RuleError, transact, nowIso, allTeamsInOrder, refreshRoles, removeTeam, fillField, addLog, usesGkQueue } from './session.js';
 
 /**
  * Retira jogador somente da pelada atual (RN-74, RN-75) e repõe a vaga automaticamente (RN-76 a RN-78).
@@ -32,19 +32,28 @@ export function removePlayer(state, pid, reason = 'other', note = '') {
         break;
       }
     }
+    const inGkQueue = !fromTeam && usesGkQueue(s) && s.gkQueue.includes(pid);
+    if (inGkQueue) s.gkQueue = s.gkQueue.filter((g) => g !== pid);
     if (!fromTeam) s.bench = s.bench.filter((b) => b !== pid);
     s.active = s.active.filter((x) => x !== pid);
     const p = s.snapshot[pid];
     const info = {
       pid, name: p.name, stars: p.stars, reason, note, at: nowIso(),
-      teamId: fromTeam?.id || null, teamLabel: fromTeam?.label || 'reserva', index, position, role, wasGk,
+      teamId: fromTeam?.id || null, teamLabel: fromTeam?.label || (inGkQueue ? 'fila de goleiros' : 'reserva'), index, position, role, wasGk: wasGk || inGkQueue,
     };
     s.removed.push(info);
     const motivo = `${REMOVAL_REASONS[reason] || reason}${note ? `: ${note}` : ''}`;
-    const text = `${p.name} saiu da pelada (${motivo})${fromTeam ? ` — ${fromTeam.label}${wasGk ? ', goleiro' : `, pos. ${position}`}` : ''}.`;
+    const where = fromTeam ? ` — ${fromTeam.label}${wasGk ? ', goleiro' : `, pos. ${position}`}` : inGkQueue ? ' — fila de goleiros' : '';
+    const text = `${p.name} saiu da pelada (${motivo})${where}.`;
     addLog(s, 'remove', text, info);
     let moves = [];
-    if (fromTeam) {
+    if (fromTeam && wasGk && usesGkQueue(s)) {
+      // RN-137: o próximo da fila de goleiros assume na hora; sem ninguém esperando, o time fica sem goleiro.
+      const next = s.gkQueue.shift();
+      if (next) fromTeam.gks.push(next);
+      moves = [next ? `Goleiro ${s.snapshot[next].name} (1º da fila de goleiros) assumiu o gol do ${fromTeam.label}.` : `Ninguém na fila de goleiros: ${fromTeam.label} fica sem goleiro.`];
+      for (const m of moves) addLog(s, 'move', m);
+    } else if (fromTeam) {
       refreshRoles(s, fromTeam);
       moves = wasGk ? cascadeGoalkeeper(s, fromTeam.id) : cascadeLine(s, fromTeam.id);
       for (const m of moves) addLog(s, 'move', m);

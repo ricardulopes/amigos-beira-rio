@@ -8,6 +8,7 @@ import './admin.test.js';
 import './vests.test.js';
 import './cloud.test.js';
 import './finance.test.js';
+import './goalkeepers.test.js';
 import './isolation.test.js';
 
 const results = await runAll();

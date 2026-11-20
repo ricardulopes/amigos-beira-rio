@@ -4,6 +4,7 @@ import { esc, fmt, stars, roleBadge, positionsBadges, starPicker, posBadge, vest
 import {
   ROLE_NAMES, REMOVAL_REASONS, filterPlayers, allTeamsInOrder, queueLabel, simulateTransfer, teamStats, linePositions, PIN_RULES, ADMIN_ACTIONS, rosterPlanSummary,
   vestOf, vestPreview, financeSettings, resetPreview, formatMoney, currentCycle, cycleRanking, reopenInfo, resetWord,
+  usesGkQueue, goalkeeperLineup,
 } from '../domain/index.js';
 import { pixBlock } from './views.js';
 
@@ -317,6 +318,7 @@ function removeModal(s, m) {
         ${t.line.map((x) => `<button class="chip ${m.pid === x.pid ? 'on' : ''}" data-act="m-set" data-k="pid" data-v="${x.pid}">${esc(s.snapshot[x.pid].name)}</button>`).join('')}
       </div></div>`).join('')}
     ${s.bench.length ? `<div class="pick-team"><div class="muted small">Reserva</div><div class="chips">${s.bench.map((g) => `<button class="chip ${m.pid === g ? 'on' : ''}" data-act="m-set" data-k="pid" data-v="${g}">🧤 ${esc(s.snapshot[g].name)}</button>`).join('')}</div></div>` : ''}
+    ${s.gkQueue?.length ? `<div class="pick-team"><div class="muted small">Fila de goleiros</div><div class="chips">${s.gkQueue.map((g) => `<button class="chip ${m.pid === g ? 'on' : ''}" data-act="m-set" data-k="pid" data-v="${g}">🧤 ${esc(s.snapshot[g].name)}</button>`).join('')}</div></div>` : ''}
     <p class="muted small">A vaga é reposta automaticamente pela esteira da fila: a posição 1 do Próximo entra no topo da equipe que perdeu o jogador, o Ré completa o Próximo, o Tri completa o Ré, e assim por diante; a vaga termina no último da fila. Goleiro é reposto pelo próximo goleiro da fila. Vale só para esta pelada; o cadastro não muda.</p>`;
   return shell('Retirar jogador', body, `<button class="btn" data-act="modal-close">Cancelar</button><button class="btn danger" data-act="remove-ok" ${m.pid ? '' : 'disabled'}>Retirar</button>`, 'tall');
 }
@@ -378,6 +380,24 @@ function swapModal(s, m) {
 }
 
 function gkModal(s, m) {
+  if (usesGkQueue(s)) {
+    // RN-137: ordem dos goleiros do dia — os dois primeiros no gol de quem está em campo, depois a fila.
+    const lineup = goalkeeperLineup(s);
+    const where = (g) => {
+      const t = s.field.find((id) => s.teams[id].gks[0] === g);
+      return t ? `no gol do <b>${esc(s.teams[t].label)}</b>` : `${s.gkQueue.indexOf(g) + 1}º da fila`;
+    };
+    const rows = lineup.map((g, i) => `<li class="prow">
+        <span class="ord pos">${i + 1}º</span><div class="grow gk-who"><div class="pname">🧤 ${esc(s.snapshot[g].name)}</div><div class="muted small">${where(g)}</div></div>
+        <button class="mini" data-act="gk-line" data-pid="${g}" data-to="${i}" ${i === 0 ? 'disabled' : ''} aria-label="Subir">▲</button>
+        <button class="mini" data-act="gk-line" data-pid="${g}" data-to="${i + 2}" ${i === lineup.length - 1 ? 'disabled' : ''} aria-label="Descer">▼</button>
+        <button class="mini" data-act="gk-line" data-pid="${g}" data-to="end" ${i === lineup.length - 1 ? 'disabled' : ''} aria-label="Fim da fila">⤓</button></li>`).join('');
+    const body = lineup.length
+      ? `<p class="muted small">Goleiros não acompanham os times da fila: quem perde sai e o goleiro dele vai para o fim da fila; o 1º da fila assume o time que entra. ▲▼ mudam a ordem; ⤓ manda para o fim da fila (ex.: goleiro atrasado).</p>
+        <ul class="plist editable">${rows}</ul>`
+      : '<p>Nenhum goleiro participando. Goleiro que chegar atrasado entra por "+ Atrasado".</p>';
+    return shell('Goleiros', body, '<button class="btn primary" data-act="modal-close">Pronto</button>', 'tall');
+  }
   const teams = allTeamsInOrder(s);
   const all = [...teams.flatMap((t) => t.gks.map((g) => ({ g, t }))), ...s.bench.map((g) => ({ g, t: null }))];
   const body = all.length

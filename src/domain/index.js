@@ -28,17 +28,19 @@ export { newId, normalizeName, nameKey, validatePlayer, snapshotPlayer, filterPl
 export { assignRoles, tacticalDeviation, formationText } from './tactics.js';
 export { createRng } from './rng.js';
 export { drawTeams, planTeamSizes, exitGroups, optimizeOrder, orderCost, staggerPattern, incompleteTarget, assignGoalkeepers, WEIGHTS } from './draw.js';
-export { LIMITS, clampLinePerTeam, clampTolerance, clampTransferQty, planParticipation, goalkeeperNote, toleranceInfo, defaultTitle, prepareDraw } from './setup.js';
+export { LIMITS, clampLinePerTeam, clampTolerance, clampTransferQty, planParticipation, goalkeeperNote, toleranceInfo, defaultTitle, prepareDraw,
+  goalkeeperOrder, moveInGoalkeeperOrder } from './setup.js';
 export {
   DEFAULT_CONFIG, RuleError, createSession, redraw, startSession, finishSession,
   teamPids, linePositions, positionOf, label, isComplete, queueLabel, player, teamStats, lineStarsRef, allTeamsInOrder, validate,
+  usesGkQueue, goalkeeperLineup,
 } from './session.js';
 export { SCENARIOS, fieldSituation, analyzeResult, drawHint, advantageStatus } from './tieRules.js';
 export { registerResult, vestPreview } from './rotation.js';
 export { VESTS, VEST_ORDER, vestOf, vestName, incomingVest, vestsText, ensureVests } from './vests.js';
 export { addLatePlayer } from './arrivals.js';
 export { removePlayer } from './removals.js';
-export { simulateTransfer, transferPlayers, movePlayerInOrder, swapPlayers, moveGoalkeeper, setPermanence } from './adjustments.js';
+export { simulateTransfer, transferPlayers, movePlayerInOrder, swapPlayers, moveGoalkeeper, moveGoalkeeperInLineup, setPermanence } from './adjustments.js';
 export { balanceWarnings, BALANCE_THRESHOLDS } from './balance.js';
 export { playerStats, balanceSummary, gamesSummary, teamExitGroups } from './stats.js';
 export { shareText } from './share.js';

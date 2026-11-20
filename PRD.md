@@ -98,8 +98,8 @@ cadastro dos jogadores até o encerramento da sequência de jogos:
   Fica salva entre aberturas do app até o próximo sorteio.
 - **RN-09** A tela mostra em tempo real: total de linha, total de goleiros, total geral, nº de equipes e
   o plano ("X equipes completas de N + 1 em formação com R").
-- **RN-10** Configurações por pelada: N (2 a 15, padrão 5), sortear com ou sem goleiros, e "equipe só é
-  completa com goleiro".
+- **RN-10** Configurações por pelada: N (2 a 15, padrão 5). *(Até 2026-11-20 havia também "sortear com ou sem
+  goleiros" e "equipe só é completa com goleiro"; o dono decidiu removê-las com a fila de goleiros, RN-134.)*
 - **RN-11** Horário combinado opcional + tolerância (configurável, padrão 10 min): a tela indica a partir
   de que horas o sorteio é recomendado. É apenas informativo; não bloqueia o sorteio.
 - **RN-12** Pode-se cadastrar um jogador a partir da tela de seleção; ele já entra marcado.
@@ -117,7 +117,37 @@ cadastro dos jogadores até o encerramento da sequência de jogos:
 - **RN-17** Ordem inicial: Time 1 e Time 2 começam em campo; Time 3 é PRO, Time 4 é RE, e assim por diante.
   Os nomes "Time X" são identificadores temporários; equipes criadas depois recebem o próximo número.
 
-### 4.1 Goleiros no sorteio
+### 4.1 Goleiros: ordem de chegada e fila própria (RN-134 a RN-137, desde 2026-11-20)
+
+Pedido do dono em 2026-11-20, para seguir a dinâmica real do campo. **Substitui RN-19 a RN-21, RN-46, RN-60,
+RN-70 e RN-78 em toda pelada nova**; peladas criadas antes continuam com o modelo antigo (descrito abaixo).
+
+- **RN-134 — Goleiros fora do sorteio; ordem de chegada.** O sorteio é **só de linha**: goleiros nunca são
+  sorteados nem misturados aos times. Na tela de presença, o admin vê os goleiros presentes numerados
+  (1º, 2º, 3º…) na ordem em que foram marcados e ajusta com ▲ ▼ a **ordem de chegada**. "Novo sorteio" mantém
+  essa ordem. As opções "sortear com/sem goleiros" e "equipe só é completa com goleiro" foram removidas:
+  equipe completa = N jogadores de linha.
+- **RN-135 — Só os dois times em campo têm goleiro.** O 1º goleiro começa no gol do Time 1 e o 2º no do Time 2;
+  os demais aguardam na **fila de goleiros** (`session.gkQueue`). Times da fila não têm goleiro. Os cards dos
+  times em campo mostram quem defende cada um a cada partida, e a tela da partida mostra a fila de goleiros.
+  Sem goleiros, os times jogam sem goleiro; com 1 só, o Time 2 começa sem goleiro (*decisão do dono*).
+- **RN-136 — Rodízio isolado dos goleiros.** A cada resultado, o goleiro **acompanha a decisão do time**: quem
+  permanece (vitória, empate do desafiante, par ou ímpar) fica com o goleiro; o goleiro de quem **sai** vai para
+  o **fim da fila de goleiros**; o time que entra recebe o **1º da fila**. Na saída dupla, os dois goleiros vão
+  para o fim da fila (o do slot A primeiro). Com mais times que goleiros (ex.: 5 times, 3 goleiros), a fila gira
+  na própria ordem. Com 1 goleiro só, ele vai para o fim da fila e volta logo para o time que entra.
+  A explicação do resultado diz quem foi para a fila e quem assumiu o gol. *Decisão do dono:* empate segue a
+  regra dos times.
+- **RN-137 — Atrasado, lesão e ajuste.** Goleiro atrasado entra no **fim da fila de goleiros**; se um time em campo
+  está sem goleiro e não há ninguém esperando, ele assume na hora. Goleiro em campo que se machuca ou vai
+  embora é substituído na hora pelo **1º da fila** (*decisão do dono*); sem ninguém esperando, o time fica sem
+  goleiro. Goleiro da fila que sai apenas deixa a fila. Em 🧤 Goleiros (rascunho e partida), o admin muda a ordem
+  (▲ ▼: os dois primeiros ficam no gol de quem está em campo) ou manda um goleiro para o fim da fila (⤓).
+- Presença e financeiro não mudam (RN-118 a RN-120): todo goleiro da pelada, inclusive quem só esperou na fila,
+  ganha presença para o ranking de goleiros (Top 4); goleiro é isento da taxa e **nunca** gera os R$ 3 automáticos;
+  o cashback dele vem só de aportes livres, que abatem a festa/campeonato pelo mesmo valor da linha.
+
+**Modelo antigo (peladas anteriores a 2026-11-20):**
 
 - **RN-18** N não inclui o goleiro.
 - **RN-19** Sorteio **sem** goleiros: goleiros presentes ficam como *reserva* (participam, mas não são distribuídos).
@@ -273,7 +303,7 @@ Custo total = técnico + tático (completas) + equipe em formação. Pesos atuai
   - se não sobrar ninguém, a equipe é desfeita (e goleiros remanescentes vão para a recebedora);
   - se a última equipe estiver completa (ou não houver fila), a equipe que saiu entra inteira no fim da
     fila, **sem divisão**.
-- **RN-46** Goleiro na divisão: o goleiro de quem saiu acompanha o bloco transferido quando a recebedora
+- **RN-46** *(só peladas antigas; nas novas vale RN-134 a RN-137)* Goleiro na divisão: o goleiro de quem saiu acompanha o bloco transferido quando a recebedora
   está sem goleiro **e** (fica completa com o bloco, ou a equipe que saiu foi totalmente absorvida, ou
   a equipe que saiu tem mais de um goleiro). Caso contrário, o goleiro fica no restante.
 - **RN-47** Ordem das operações: (1) quem sai vai para a fila, com divisão se necessário; (2) quem entra
@@ -326,7 +356,7 @@ Definições no momento do empate: **PRO completo**, **RE completo** (RN-59) e "
 - **RN-59** Para as regras de empate, conta apenas se **PRO** e **RE** estão completos (ver glossário).
   Equipe incompleta nunca conta como completa. Ex.: PRO completo + RE incompleto → só um completo →
   RN-57. PRO e RE completos → RN-54.
-- **RN-60** Com a opção "equipe só é completa com goleiro", uma equipe com N de linha mas sem goleiro
+- **RN-60** *(só peladas antigas; nas novas vale RN-134 a RN-137)* Com a opção "equipe só é completa com goleiro", uma equipe com N de linha mas sem goleiro
   é incompleta para essas regras.
 
 ### 9.4 Conflito resolvido: primeiro jogo × saída dupla
@@ -393,7 +423,7 @@ recalculada em toda transação que muda o campo (resultado, retirada, transfer�
   1º atrasado entra na 3, o 2º na 4, o 3º na 5 e o 4º abre o Time 6 na posição 1. (Sem fila, considera a
   última equipe em campo apenas se houver menos de duas em campo.) Os avisos de RN-72 continuam apenas
   informativos e nunca mudam onde o atrasado entra.
-- **RN-70** Goleiro atrasado: vai para a primeira equipe sem goleiro, na ordem PRO, RE, …, depois campo;
+- **RN-70** *(só peladas antigas; nas novas vale RN-134 a RN-137)* Goleiro atrasado: vai para a primeira equipe sem goleiro, na ordem PRO, RE, …, depois campo;
   se todas tiverem goleiro, vai para a última da fila. Em sorteio sem goleiros, vai para a reserva.
 - **RN-71** Estrelas, funções, contagem e completude são atualizadas na hora.
 - **RN-72** Aviso de desequilíbrio (sem reorganizar nada): equipe que fica completa com soma diferente
@@ -423,7 +453,7 @@ completam o 5º time; os dois seguintes abrem o 6º; o quinto atrasado entra no 
   - vaga na última equipe da fila, ou sem fila, fica aberta.
 - **RN-77** A retirada não altera permanência, estatísticas, campo nem a ordem das equipes. A lógica de
   vitória/empate/derrota (seções 8 e 9) continua a mesma.
-- **RN-78** Goleiro retirado: mesma esteira, só entre equipes com goleiro. A próxima equipe na ordem que
+- **RN-78** *(só peladas antigas; nas novas vale RN-134 a RN-137)* Goleiro retirado: mesma esteira, só entre equipes com goleiro. A próxima equipe na ordem que
   tem goleiro cede um; se ela ainda ficar com goleiro, a cascata para; senão continua. Sem goleiro na
   sequência, a equipe fica sem goleiro. Retirada da reserva não move ninguém. Depois de aplicar, o app
   mostra todas as movimentações; tudo vai para o histórico e pode ser desfeito.
@@ -673,7 +703,7 @@ Proteções da auditoria de ponto cego (pedido do dono em 2026-11-20):
 
 ---
 
-## 18. Testes automatizados (cobertura atual: 153 testes)
+## 18. Testes automatizados (cobertura atual: 166 testes)
 
 Executar em `tests/index.html` (navegador) ou `node tests/run-node.mjs`.
 
@@ -686,6 +716,7 @@ Executar em `tests/index.html` (navegador) ou `node tests/run-node.mjs`.
 | `tests/cloud.test.js` | Visitante não grava (mudança sem admin é recusada e não entra na fila); banco unificado: diferenças entre versões, fila offline (sem duplicar, versão-base da primeira mudança, exclusões), pelada nova, mescla com a nuvem com e sem pendências, conversão de linhas |
 | `tests/admin.test.js` | Formato do PIN mestre, visitante só vê/compartilha/exporta × PIN mestre para qualquer alteração, sem código do jogador, acesso de 12 h; lista oficial embutida; leitura da lista em lote (formatos, "Felipe 2", erros), mesclar, X, jogador novo incompleto, ida e volta, substituir |
 | `tests/vests.test.js` | Coletes Amarelo/Azul: abertura, vitória de cada cor, sequência de vitórias, empate com saída dupla, empate com um só saindo, indicador neutro da PRO, prévia e explicação, WhatsApp, integridade (cores diferentes), migração de peladas antigas |
+| `tests/goalkeepers.test.js` | Goleiros (RN-134 a RN-137): ordem de chegada, sorteio só de linha, 1º/2º em campo e fila, vitória/empate/saída dupla com 5 times e 3 goleiros, 1 goleiro só, atrasado, lesão, reordenar, integridade, WhatsApp, presença e cashback do goleiro |
 | `tests/finance.test.js` | Financeiro (RN-118 a RN-132): cashback só com pelada paga (Pix/Cartão/Dinheiro), ranking guardado no encerramento e exclusão bloqueada, reabrir ciclo, períodos anteriores e acerto da festa, atleta excluído com aportes, zerar com rascunho/palavra forte no oficial; dinheiro em centavos, R$ 18 = 15 + 3, presença só em pelada iniciada e com o tipo do snapshot, ciclos manuais (encerrar/iniciar, folga conta no próximo, ciclo encerrado consultável), rankings com Top 32/Top 4 e empate no corte, cashback que só zera quando o admin manda e período anterior no extrato, aportes, festa quitada, extrato, pagamento puro (goleiro isento), resumo do caixa, Pix/QR validados, reset |
 | `tests/isolation.test.js` | Visitante só lê: ações livres do app só de leitura/navegação, todo campo que altera dados exige PIN, nenhuma função do banco liberada sem ser de admin; o domínio não usa DOM/navegador/armazenamento, só importa a si mesmo, e interface/persistência/nuvem só o acessam por `src/domain/index.js`; nenhuma chave secreta do Supabase no app |
 

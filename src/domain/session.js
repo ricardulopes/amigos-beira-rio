@@ -50,7 +50,7 @@ export function makeTeam(s, { line = [], gks = [], origin = 'draw', note = '' } 
  * Cria a sessão (pelada) a partir de um resultado de sorteio.
  * @param {{title, config, snapshots: Record<string,object>, draw, scheduledAt?, id?}} p
  */
-export function createSession({ title, config, snapshots, draw, scheduledAt = null, id }) {
+export function createSession({ title, config, snapshots, draw, gkOrder = [], scheduledAt = null, id }) {
   const s = {
     id: id || newId('s'),
     title: title || 'Pelada',
@@ -73,13 +73,14 @@ export function createSession({ title, config, snapshots, draw, scheduledAt = nu
     log: [],
     draws: [],
     seq: 0,
+    gkQueue: [],
   };
-  applyDraw(s, draw);
+  applyDraw(s, draw, gkOrder);
   validate(s);
   return s;
 }
 
-function applyDraw(s, draw) {
+function applyDraw(s, draw, gkOrder = []) {
   s.teams = {};
   s.field = [];
   s.queue = [];
@@ -87,27 +88,31 @@ function applyDraw(s, draw) {
   s.bench = [...(draw.unusedGoalkeepers || [])];
   const ids = [];
   for (const t of draw.teams) {
-    const team = makeTeam(s, { line: t.line.map((x) => ({ pid: x.pid, role: x.role })), gks: [...t.gks], origin: 'draw' });
+    // RN-134: o sorteio é só de linha; os goleiros entram pela fila de goleiros (ordem de chegada).
+    const team = makeTeam(s, { line: t.line.map((x) => ({ pid: x.pid, role: x.role })), gks: [], origin: 'draw' });
     ids.push(team.id);
   }
   s.field = ids.slice(0, 2);
   s.queue = ids.slice(2);
+  s.gkQueue = gkOrder.filter((pid) => s.snapshot[pid]?.type === 'gk');
+  syncGoalkeepers(s); // 1º goleiro no Time 1, 2º no Time 2; os demais aguardam
   s.vests = {};
   syncVests(s); // RN-108: Time 1 começa de Amarelo e Time 2 de Azul
-  s.active = [...ids.flatMap((id) => teamPids(s.teams[id])), ...s.bench];
+  s.active = [...ids.flatMap((id) => teamPids(s.teams[id])), ...s.gkQueue, ...s.bench];
   s.draws.push({ at: nowIso(), seed: draw.seed, metrics: draw.metrics, ref: draw.ref, teams: snapshotTeams(s) });
   addLog(s, 'draw', `Sorteio realizado: ${ids.length} equipe(s).`, { withoutGk: draw.withoutGk?.map((i) => `Time ${i + 1}`) });
 }
 
 /** Refaz o sorteio de uma pelada ainda não iniciada (RN-38, RN-40). */
-export function redraw(state, { draw, config, snapshots }) {
+export function redraw(state, { draw, config, snapshots, gkOrder }) {
   if (state.games.length) throw new RuleError('Não é possível sortear de novo depois que a pelada começou.');
   const s = clone(state);
   if (config) s.config = { ...s.config, ...config };
   if (snapshots) s.snapshot = clone(snapshots);
   s.arrivals = [];
   s.removed = [];
-  applyDraw(s, draw);
+  // Novo sorteio sem mudar participantes: mantém a ordem de chegada dos goleiros (campo + fila).
+  applyDraw(s, draw, gkOrder || goalkeeperLineup(s));
   validate(s);
   return s;
 }
@@ -156,12 +161,44 @@ export function label(s, tid) {
   return s.teams[tid]?.label ?? '?';
 }
 
-/** RN-59/RN-60: N de linha e, se configurado, goleiro. */
+/** RN-59: equipe completa = N de linha. (RN-60, "só é completa com goleiro", vale só para peladas antigas.) */
 export function isComplete(s, team) {
   if (!team) return false;
   if (team.line.length < s.config.linePerTeam) return false;
-  if (s.config.useGoalkeepers && s.config.requireGkForComplete && team.gks.length === 0) return false;
+  if (!usesGkQueue(s) && s.config.useGoalkeepers && s.config.requireGkForComplete && team.gks.length === 0) return false;
   return true;
+}
+
+// ---------------------------------------------------------------- goleiros (RN-134 a RN-137)
+
+/** Pelada com fila de goleiros (todas as criadas a partir de 2026-11-20). Peladas antigas seguem o modelo anterior. */
+export const usesGkQueue = (s) => Array.isArray(s.gkQueue);
+
+/**
+ * RN-135: só as duas equipes em campo têm goleiro; os demais aguardam em `gkQueue`, em ordem.
+ * Goleiro de equipe que foi para a fila vai para o fim da fila de goleiros (na ordem em que as equipes
+ * entraram na fila); equipe em campo sem goleiro recebe o primeiro da fila (slot A antes do B).
+ */
+export function syncGoalkeepers(s) {
+  if (!usesGkQueue(s)) return;
+  for (const id of s.queue) {
+    const t = s.teams[id];
+    if (t.gks.length) s.gkQueue.push(...t.gks.splice(0));
+  }
+  for (const id of s.field) {
+    const t = s.teams[id];
+    if (t.gks.length > 1) s.gkQueue.push(...t.gks.splice(1));
+  }
+  for (const id of s.field) {
+    const t = s.teams[id];
+    if (!t.gks.length && s.gkQueue.length) t.gks.push(s.gkQueue.shift());
+  }
+}
+
+/** Ordem completa dos goleiros: os de campo (slot A, slot B) e depois a fila de espera. */
+export function goalkeeperLineup(s) {
+  if (!usesGkQueue(s)) return Object.values(s.teams).flatMap((t) => t.gks);
+  return [...s.field.flatMap((id) => s.teams[id].gks), ...s.gkQueue];
 }
 
 /** Rótulo dinâmico de cada equipe: EM JOGO, PRO, RE, TRI, 4º, 5º... */
@@ -251,6 +288,15 @@ export function validate(s) {
     }
   }
   for (const b of s.bench) place(b, 'reserva');
+  if (usesGkQueue(s)) {
+    // RN-135: goleiro só nas equipes em campo (no máximo um); o resto na fila de goleiros.
+    for (const g of s.gkQueue) {
+      if (s.snapshot[g]?.type !== 'gk') fail(`${s.snapshot[g]?.name || g} na fila de goleiros não é goleiro.`);
+      place(g, 'fila de goleiros');
+    }
+    for (const id of s.queue) if (s.teams[id].gks.length) fail(`${label(s, id)} está na fila com goleiro.`);
+    for (const id of s.field) if (s.teams[id].gks.length > 1) fail(`${label(s, id)} com mais de um goleiro.`);
+  }
   if (s.vests) {
     // RN-109: as duas equipes em campo vestem lados diferentes do colete.
     for (const id of Object.keys(s.vests)) if (!s.field.includes(id)) fail(`colete registrado para ${id}, que não está em campo.`);
@@ -283,6 +329,7 @@ export function refreshRoles(s, team) {
 export function transact(state, fn) {
   const s = clone(state);
   const out = fn(s) || {};
+  syncGoalkeepers(s); // goleiros acompanham qualquer mudança de campo (RN-135)
   syncVests(s); // coletes acompanham qualquer mudança de campo (RN-109 a RN-111)
   validate(s);
   return { state: s, ...out };

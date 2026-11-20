@@ -1,5 +1,5 @@
 // Jogadores atrasados (PRD seção 10): ordem de chegada, sem novo sorteio e sem reorganizar equipes.
-import { RuleError, transact, clone, nowIso, makeTeam, refreshRoles, fillField, addLog } from './session.js';
+import { RuleError, transact, clone, nowIso, makeTeam, refreshRoles, fillField, addLog, usesGkQueue } from './session.js';
 import { balanceWarnings } from './balance.js';
 
 /**
@@ -20,7 +20,16 @@ export function addLatePlayer(state, snap) {
     s.arrivals.push({ pid: snap.id, at: nowIso(), order });
     const warnings = [];
     let text;
-    if (snap.type === 'gk') {
+    if (snap.type === 'gk' && usesGkQueue(s)) {
+      // RN-137: goleiro atrasado vai para o fim da fila de goleiros; se um time em campo está sem
+      // goleiro, ele assume na hora (syncGoalkeepers, no fim da transação).
+      s.gkQueue.push(snap.id);
+      const pos = s.gkQueue.length;
+      const fieldWithout = s.field.find((id) => !s.teams[id].gks.length);
+      text = fieldWithout && pos === 1
+        ? `${snap.name} (goleiro) chegou (${order}º atrasado) e assumiu o gol do ${s.teams[fieldWithout].label}.`
+        : `${snap.name} (goleiro) chegou (${order}º atrasado) e entrou no fim da fila de goleiros (${pos}º da fila).`;
+    } else if (snap.type === 'gk') {
       if (!s.config.useGoalkeepers) {
         s.bench.push(snap.id);
         text = `${snap.name} (goleiro) chegou e ficou como reserva (sorteio sem goleiros).`;
