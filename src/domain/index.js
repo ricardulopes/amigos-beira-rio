@@ -53,4 +53,5 @@ export {
   semesterOf, semesterLabel, countedPeladas, paymentOf, attendanceRecords, FIRST_CYCLE_ID, NEXT_CYCLE, cycleList, cycleOfDate,
   currentCycle, cyclesAvailable, cycleRanking, suggestCycleLabel, closeCycle, startCycle, cycleCashback, statement, groupCashback, paymentSummary, setPayment, addContribution, removeContribution, resetPreview, resetCycle,
   isPaid, closedCycleOf, assertSessionDeletable, reopenInfo, reopenCycle, settleParty, unsettleParty, financeAthletes, resetWord,
+  CALL_PAYMENT_METHODS, toggleCallPayment, keepCallPayments, drawPayments, cashReport, callPaymentOf,
 } from './finance.js';

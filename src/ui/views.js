@@ -7,6 +7,7 @@ import {
   ADMIN_ACTIONS, PUBLIC_ACTIONS, allTeamsInOrder, queueLabel, teamStats, isComplete, linePositions, playerStats, balanceSummary, gamesSummary, teamExitGroups, drawHint, advantageStatus,
   vestOf, vestName, incomingVest,
   financeSettings, cyclesAvailable, cycleRanking, cycleList, NEXT_CYCLE, statement, paymentSummary, formatMoney, PAYMENT_METHODS, FINANCE_RULES,
+  CALL_PAYMENT_METHODS, callPaymentOf, cashReport,
   groupCashback, closedCycleOf, reopenInfo, financeAthletes, usesGkQueue, goalkeeperPreview,
 } from '../domain/index.js';
 
@@ -161,15 +162,24 @@ export function setupView() {
       <button class="btn small ghost" data-act="setup-none">Limpar</button>
     </div>
     <ul class="list check-list">
-      ${players.map((p) => `<li class="row ${sel.has(p.id) ? 'checked' : ''}" data-act="setup-toggle" data-id="${p.id}">
+      ${players.map((p) => `<li class="row ${sel.has(p.id) ? 'checked has-pay' : ''}" data-act="setup-toggle" data-id="${p.id}">
           <span class="check" role="checkbox" aria-checked="${sel.has(p.id)}"></span>
           <div class="grow"><div class="name">${esc(p.name)}</div><div class="badges">${positionsBadges(p)}</div></div>
           ${stars(p.stars)}
+          ${sel.has(p.id) ? callPayButtons(p.id, st, s) : ''}
         </li>`).join('') || `<li class="empty-row">Nenhum jogador. <button class="btn small" data-act="player-new" data-select="1">Cadastrar</button></li>`}
     </ul>
     <button class="btn ghost wide" data-act="player-new" data-select="1">+ Cadastrar jogador e marcar presença</button>
   </main>
   <div class="cta-bar"><button class="btn primary big wide" data-act="do-draw" ${!nLine || blocked ? 'disabled' : ''}>SORTEAR ${teamCount ? `${teamCount} EQUIPES` : ''}</button></div>`;
+}
+
+/** RN-139: Pix / Cartão / Dinheiro na frente de cada atleta de linha marcado. Nada marcado = pendente. */
+function callPayButtons(pid, st, s) {
+  const { method } = callPaymentOf(st.payments, s, pid);
+  const short = { pix: 'Pix', card: 'Cartão', cash: 'Dinheiro' };
+  return `<div class="call-pay" role="group" aria-label="Pagamento">${CALL_PAYMENT_METHODS.map((m) => `<button class="pay-btn ${method === m ? 'on' : ''}" data-act="call-pay" data-pid="${esc(pid)}" data-m="${m}" aria-pressed="${method === m}">${short[m]}</button>`).join('')}${
+    method === 'exempt' ? '<span class="pill">Isento</span>' : method ? '' : '<span class="pay-pending">pendente</span>'}</div>`;
 }
 
 /**
@@ -580,13 +590,30 @@ function cashTab() {
   return `<div class="chips scroll-x">${chips}</div>
     <p class="small"><b>${esc(s.title)}</b>${s.status === 'draft' ? ' · <span class="warn-text">sorteio ainda não iniciado (a presença conta quando a pelada começa)</span>' : ''}</p>
     ${closed ? `<p class="alert warn small">🔒 Pelada do ciclo "${esc(closed.label)}", já encerrado. Mudar um pagamento aqui altera o cashback desse período e pede confirmação.</p>` : ''}
-    <section class="counters">
-      <div><b>${p.pix}</b><span>Pix</span></div><div><b>${p.card}</b><span>Cartão</span></div>
-      <div><b>${p.cash}</b><span>Dinheiro</span></div><div><b>${p.pending}</b><span>pendentes</span></div>
-    </section>
-    <p class="small">Recebido: <b>${formatMoney(p.collected)}</b> de ${formatMoney(p.expected)} · ${formatMoney(p.operational)} operacional + ${formatMoney(p.cashbackRetained)} de cashback · ${p.exempt} isento(s).</p>
+    ${cashClosing(s, p)}
     <ul class="list pay-list">${p.rows.map(row).join('')}</ul>
     <p class="muted small">Toque de novo na forma marcada para voltar a "pendente". Só a pelada paga (Pix, Cartão ou Dinheiro) soma ${formatMoney(FINANCE_RULES.cashbackPerGame)} ao cashback; pendente e isento não somam.</p>`;
+}
+
+/** RN-140: fechamento de caixa do dia — por forma, pendentes e soma geral conferida com o esperado. */
+export function cashClosing(s, p = paymentSummary(s)) {
+  const r = cashReport(s);
+  const rows = r.methods.map((m) => `<tr><td>${esc(m.label)}</td><td class="num">${m.count}</td><td class="num">${formatMoney(m.cents)}</td></tr>`).join('');
+  const check = r.balanced
+    ? `<p class="cash-ok small">✅ Caixa fechado: ${formatMoney(r.total)} recebidos = ${formatMoney(r.expected)} esperados.</p>`
+    : `<p class="cash-diff small">Faltam <b>${formatMoney(r.difference)}</b> para fechar (${r.pending.length} pendente(s) × ${formatMoney(FINANCE_RULES.lineFee)}).</p>`;
+  return `<section class="card cash-report">
+      <h3>Fechamento de caixa</h3>
+      <table class="cash-table">
+        <thead><tr><th>Forma</th><th class="num">Atletas</th><th class="num">Valor</th></tr></thead>
+        <tbody>${rows}<tr class="pend"><td>Pendentes</td><td class="num">${r.pending.length}</td><td class="num">${formatMoney(r.pendingCents)}</td></tr></tbody>
+        <tfoot><tr><td>Soma geral</td><td class="num">${r.methods.reduce((a, m) => a + m.count, 0)}</td><td class="num">${formatMoney(r.total)}</td></tr></tfoot>
+      </table>
+      <p class="small">Esperado: <b>${formatMoney(r.expected)}</b> (${r.lineCount - r.exemptLine} de linha × ${formatMoney(FINANCE_RULES.lineFee)})${r.exemptLine ? ` · ${r.exemptLine} de linha isento(s)` : ''}${r.goalkeepers ? ` · ${r.goalkeepers} goleiro(s) isento(s)` : ''}.</p>
+      ${check}
+      ${r.pending.length ? `<p class="small"><b>Em aberto:</b> ${r.pending.map((x) => esc(x.name)).join(', ')}.</p>` : ''}
+      <p class="muted small">Do recebido, ${formatMoney(p.operational)} operacional + ${formatMoney(p.cashbackRetained)} de cashback.</p>
+    </section>`;
 }
 
 function contributionsTab(f) {

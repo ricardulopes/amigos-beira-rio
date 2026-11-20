@@ -99,7 +99,11 @@ será zerado antes do ciclo oficial.
 - **Extrato (qualquer pessoa):** escolha seu nome e veja jogos, %, cashback, quanto falta para a festa, pendências e
   o cashback de todos os períodos anteriores. O admin registra ali o **acerto da festa** de cada período.
 - **Pix:** chave, "Copia e Cola" e QR Code da tesouraria, com botão de copiar (também no atalho 💠 da tela inicial).
-- **Admin (PIN mestre):** **Caixa do dia** (marcar Pix, Cartão, Dinheiro ou Isento de cada atleta; atalho
+- **Na chamada (admin):** na frente de cada atleta de linha marcado há **Pix / Cartão / Dinheiro**. Toque para marcar,
+  toque de novo para voltar a pendente. Vale antes do sorteio (vai junto para a pelada) e durante a pelada (intervalo).
+  Goleiros não têm botões (isentos).
+- **Admin (PIN mestre):** **Caixa do dia** (marcar Pix, Cartão, Dinheiro ou Isento de cada atleta, com o **fechamento de
+  caixa**: atletas e valor por forma, pendentes com nomes e soma geral conferida com o esperado; atalho
   "💰 Pagamentos" no sorteio e em "⋯ Mais" na partida), **Aportes** e, em **Ajustes → Financeiro e Pix**,
   configurar o Pix/QR Code e **🧹 Zerar lançamentos de teste** (apaga peladas, presenças, pagamentos e aportes;
   mantém cadastro e Pix; pede para digitar ZERAR; recusa com pelada em andamento ou rascunho). Depois de zerar,

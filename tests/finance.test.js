@@ -7,6 +7,7 @@ import {
   cycleRanking, cycleCashback, statement, groupCashback, paymentSummary, setPayment, addContribution, removeContribution,
   resetPreview, resetCycle, validate, cycleList, currentCycle, closeCycle, startCycle, suggestCycleLabel, FIRST_CYCLE_ID, NEXT_CYCLE,
   isPaid, closedCycleOf, assertSessionDeletable, reopenInfo, reopenCycle, settleParty, unsettleParty, financeAthletes, resetWord,
+  CALL_PAYMENT_METHODS, toggleCallPayment, keepCallPayments, drawPayments, cashReport, callPaymentOf, createSession, redraw,
 } from '../src/domain/index.js';
 
 /** Fecha o ciclo aberto e abre outro (datas explícitas). */
@@ -230,7 +231,7 @@ suite('Financeiro — pagamentos do dia e reset', () => {
     const { state } = setPayment(s, pid, 'pix');
     assert.equal(state.payments[pid], 'pix');
     assert.equal(setPayment(s, pid, 'cash').state.payments[pid], 'cash', 'Dinheiro é forma de pagamento');
-    assert.equal(s.payments, undefined, 'o estado recebido não muda');
+    assert.deepEqual(s.payments, {}, 'o estado recebido não muda (pelada nova começa sem pagamentos)');
     validate(state);
     assert.throws(() => setPayment(s, 'T1G1', 'pix'), /isento/);
     assert.throws(() => setPayment(s, 'ninguem', 'pix'), /não participou/);
@@ -361,5 +362,95 @@ suite('Financeiro — proteções (RN-120, RN-129 a RN-132)', () => {
     const list = financeAthletes([{ id: 'ana', name: 'Ana' }], [pel('a', '2026-08-02T09:00:00', [L('bia', 'Bia')])], f);
     assert.deepEqual(list.map((x) => [x.name, x.removed]), [['Ana', false], ['Bia', true], ['Goleiro X', true]]);
     assert.equal(statement('gk-x', [], f).cashback.total, 5000);
+  });
+});
+
+suite('Financeiro — pagamento na chamada e fechamento de caixa (RN-139, RN-140)', () => {
+  const fee = FINANCE_RULES.lineFee;
+
+  test('Chamada: tocar marca, tocar de novo desmarca (pendente); trocar de forma substitui', () => {
+    assert.deepEqual(CALL_PAYMENT_METHODS, ['pix', 'card', 'cash']);
+    let p = toggleCallPayment({}, 'a', 'pix');
+    assert.deepEqual(p, { a: 'pix' });
+    p = toggleCallPayment(p, 'a', 'cash');
+    assert.deepEqual(p, { a: 'cash' }, 'troca de forma');
+    const before = { ...p };
+    const off = toggleCallPayment(p, 'a', 'cash');
+    assert.deepEqual(off, {}, 'toque no botão ativo volta para pendente');
+    assert.deepEqual(p, before, 'não altera o mapa recebido');
+    assert.throws(() => toggleCallPayment({}, 'a', 'exempt'), /inválida/);
+    assert.throws(() => toggleCallPayment({}, 'a', 'boleto'), /inválida/);
+  });
+
+  test('Chamada: desmarcar a presença descarta o pagamento marcado', () => {
+    assert.deepEqual(keepCallPayments({ a: 'pix', b: 'card', c: 'cash' }, ['a', 'c']), { a: 'pix', c: 'cash' });
+    assert.deepEqual(keepCallPayments({ a: 'lixo' }, ['a']), {}, 'valor inválido é descartado');
+  });
+
+  test('Sorteio leva os pagamentos da chamada para a pelada (só linha presente; goleiro segue isento)', () => {
+    const base = mkSession([5, 5], { goalkeepers: 1 });
+    const call = { T1P1: 'pix', T1P2: 'card', T2P1: 'cash', G1: 'pix', fora: 'pix' };
+    const pay = drawPayments(base.snapshot, call);
+    assert.deepEqual(pay, { T1P1: 'pix', T1P2: 'card', T2P1: 'cash' });
+    const draw = { teams: Object.values(base.teams).map((t) => ({ line: t.line, gks: [] })), seed: 1, metrics: {}, ref: 2, withoutGk: [], unusedGoalkeepers: [] };
+    const s = createSession({ title: 'X', config: base.config, snapshots: base.snapshot, draw, gkOrder: ['G1'], payments: pay });
+    validate(s);
+    assert.deepEqual(s.payments, pay);
+    const r = paymentSummary(s);
+    assert.equal(r.pix, 1);
+    assert.equal(r.card, 1);
+    assert.equal(r.cash, 1);
+    assert.equal(r.pending, 7);
+    // refazer sorteio: o que a pelada já tinha prevalece sobre a chamada
+    const merged = drawPayments(s.snapshot, { T1P1: 'cash', T1P3: 'pix' }, s.payments);
+    assert.equal(merged.T1P1, 'pix');
+    assert.equal(merged.T1P3, 'pix');
+    const s2 = redraw(s, { draw, payments: merged });
+    assert.deepEqual(s2.payments, merged);
+    assert.deepEqual(createSession({ title: 'Y', config: base.config, snapshots: base.snapshot, draw }).payments, {}, 'sem chamada: todos pendentes');
+  });
+
+  test('Chamada: atleta já na pelada em rascunho/ao vivo usa o pagamento da pelada; encerrada não', () => {
+    let s = mkSession([5, 5]);
+    s = setPayment(s, 'T1P1', 'card').state;
+    assert.deepEqual(callPaymentOf({ T1P1: 'pix' }, s, 'T1P1'), { sid: s.id, method: 'card' });
+    assert.deepEqual(callPaymentOf({ X: 'pix' }, s, 'X'), { sid: null, method: 'pix' }, 'fora da pelada: chamada');
+    assert.deepEqual(callPaymentOf({}, { ...s, status: 'draft' }, 'T1P2'), { sid: s.id, method: null });
+    assert.deepEqual(callPaymentOf({}, { ...s, status: 'finished' }, 'T1P1'), { sid: null, method: null }, 'encerrada: só pela aba Caixa');
+    assert.deepEqual(callPaymentOf({}, null, 'T1P1'), { sid: null, method: null });
+  });
+
+  test('Fechamento de caixa: por forma, pendentes listados e soma geral batendo com o esperado', () => {
+    let s = mkSession([5, 5], { goalkeepers: 2 });
+    const marks = { T1P1: 'pix', T1P2: 'pix', T1P3: 'pix', T1P4: 'card', T1P5: 'card', T2P1: 'cash', T2P2: 'exempt' };
+    for (const [pid, m] of Object.entries(marks)) s = setPayment(s, pid, m).state;
+    const r = cashReport(s);
+    assert.deepEqual(r.methods.map((m) => [m.method, m.count, m.cents]), [['pix', 3, 3 * fee], ['card', 2, 2 * fee], ['cash', 1, fee]]);
+    assert.deepEqual(r.pending.map((x) => x.pid).sort(), ['T2P3', 'T2P4', 'T2P5']);
+    assert.equal(r.pendingCents, 3 * fee);
+    assert.equal(r.lineCount, 10);
+    assert.equal(r.exemptLine, 1);
+    assert.equal(r.goalkeepers, 2, 'goleiros fora do esperado');
+    assert.equal(r.total, 6 * fee);
+    assert.equal(r.expected, 9 * fee, '10 de linha − 1 isento');
+    assert.equal(r.difference, 3 * fee);
+    assert.ok(!r.balanced);
+    assert.equal(r.total + r.pendingCents, r.expected, 'recebido + pendente = esperado');
+    for (const pid of ['T2P3', 'T2P4', 'T2P5']) s = setPayment(s, pid, 'pix').state;
+    const done = cashReport(s);
+    assert.ok(done.balanced);
+    assert.equal(done.pending.length, 0);
+    assert.equal(done.total, done.expected);
+    assert.equal(done.methods[0].count, 6);
+    assert.equal(formatMoney(done.total), formatMoney(9 * fee));
+  });
+
+  test('Fechamento de caixa segue a regra do cashback: só pago gera os R$ 3 (RN-120 intacta)', () => {
+    let s = mkSession([5]);
+    s = setPayment(s, 'T1P1', 'cash').state;
+    s = setPayment(s, 'T1P2', 'exempt').state;
+    const recs = attendanceRecords([{ ...s, createdAt: '2026-11-20T20:00:00' }], {});
+    assert.equal(recs.filter((x) => x.credited).length, 1);
+    assert.equal(cashReport(s).total, fee);
   });
 });

@@ -10,7 +10,7 @@ import {
   transferPlayers, movePlayerInOrder, swapPlayers, moveGoalkeeper, moveGoalkeeperInLineup, setPermanence, RuleError,
   goalkeeperOrder, moveInGoalkeeperOrder, goalkeeperLineup,
   shareText, validatePinFormat, parseRoster, planRosterImport, applyRosterImport, rosterPlanSummary,
-  rosterText, financeSettings, setPayment, addContribution, removeContribution, setPixConfig, setPixQr, resetCycle, QR_MAX_CHARS, formatMoney,
+  rosterText, financeSettings, setPayment, toggleCallPayment, keepCallPayments, drawPayments, callPaymentOf, addContribution, removeContribution, setPixConfig, setPixQr, resetCycle, QR_MAX_CHARS, formatMoney,
   currentCycle, closeCycle, startCycle, suggestCycleLabel, reopenCycle, closedCycleOf, assertSessionDeletable, settleParty, unsettleParty,
   PAYMENT_METHODS,
 } from '../domain/index.js';
@@ -372,6 +372,7 @@ const actions = {
     const i = st.selected.indexOf(d.id);
     if (i >= 0) st.selected.splice(i, 1);
     else st.selected.push(d.id);
+    if (st.payments) st.payments = keepCallPayments(st.payments, st.selected);
     save();
     render();
   },
@@ -387,6 +388,17 @@ const actions = {
     // "Limpar" da lista de linha não desmarca os goleiros (eles têm a seção própria no topo)
     const st = setupState();
     st.selected = st.selected.filter((id) => app.db.players.find((p) => p.id === id)?.type === 'gk');
+    if (st.payments) st.payments = keepCallPayments(st.payments, st.selected);
+    save();
+    render();
+  },
+  // RN-139: Pix / Cartão / Dinheiro na chamada. Atleta já na pelada (rascunho ou ao vivo) → pagamento da pelada;
+  // senão fica na chamada e passa para a pelada no sorteio. Tocar de novo desmarca (pendente).
+  'call-pay': (d) => {
+    const st = setupState();
+    const target = callPaymentOf(st.payments, activeSession(), d.pid);
+    if (target.sid) return actions['pay-set']({ sid: target.sid, pid: d.pid, m: target.method === d.m ? '' : d.m });
+    st.payments = toggleCallPayment(st.payments || {}, d.pid, d.m);
     save();
     render();
   },
@@ -896,16 +908,19 @@ function doDraw() {
       players: app.db.players, selectedIds: st.selected, config: st.config, settings: app.db.settings, gkOrder: st.gkOrder || [],
     });
     const ms = Math.round(performance.now() - t0);
+    // RN-139: o que foi marcado na chamada vai para a pelada (só linha presente); o que a pelada já tinha prevalece.
+    const payments = drawPayments(snapshots, st.payments || {}, current?.status === 'draft' ? current.payments || {} : {});
     if (current && current.status === 'draft') {
-      const next = redraw(current, { draw, config, snapshots, gkOrder });
+      const next = redraw(current, { draw, config, snapshots, gkOrder, payments });
       next.title = title;
       store.pushUndo(current.id, 'Sorteio', current);
       replaceSession(next);
     } else {
-      const s = createSession({ title, config, snapshots, draw, gkOrder, scheduledAt: st.scheduled || null });
+      const s = createSession({ title, config, snapshots, draw, gkOrder, scheduledAt: st.scheduled || null, payments });
       app.db.sessions.push(s);
       app.db.activeSessionId = s.id;
     }
+    st.payments = {};
     save();
     app.ui.lastExplanation = null;
     const lack = draw.withoutGk.length ? ` Sem goleiro: ${draw.withoutGk.map((i) => `Time ${i + 1}`).join(', ')}.` : '';

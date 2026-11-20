@@ -49,7 +49,7 @@ export function makeTeam(s, { line = [], gks = [], origin = 'draw', note = '' } 
  * Cria a sessão (pelada) a partir de um resultado de sorteio.
  * @param {{title, config, snapshots: Record<string,object>, draw, scheduledAt?, id?}} p
  */
-export function createSession({ title, config, snapshots, draw, gkOrder = [], scheduledAt = null, id }) {
+export function createSession({ title, config, snapshots, draw, gkOrder = [], scheduledAt = null, id, payments = {} }) {
   const s = {
     id: id || newId('s'),
     title: title || 'Pelada',
@@ -73,6 +73,7 @@ export function createSession({ title, config, snapshots, draw, gkOrder = [], sc
     draws: [],
     seq: 0,
     gkQueue: [],
+    payments: { ...payments }, // RN-139: pagamentos marcados na chamada antes do sorteio
   };
   applyDraw(s, draw, gkOrder);
   validate(s);
@@ -103,11 +104,12 @@ function applyDraw(s, draw, gkOrder = []) {
 }
 
 /** Refaz o sorteio de uma pelada ainda não iniciada (RN-38, RN-40). */
-export function redraw(state, { draw, config, snapshots, gkOrder }) {
+export function redraw(state, { draw, config, snapshots, gkOrder, payments }) {
   if (state.games.length) throw new RuleError('Não é possível sortear de novo depois que a pelada começou.');
   const s = clone(state);
   if (config) s.config = { ...s.config, ...config };
   if (snapshots) s.snapshot = clone(snapshots);
+  if (payments) s.payments = { ...payments };
   s.arrivals = [];
   s.removed = [];
   // Novo sorteio sem mudar participantes: mantém a ordem de chegada dos goleiros (campo + fila).

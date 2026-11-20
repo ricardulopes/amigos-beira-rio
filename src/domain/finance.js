@@ -3,7 +3,8 @@
 // Onde os dados ficam (sem tabela nova no banco):
 // - presença: quem está no `snapshot` de uma pelada iniciada (ao vivo ou encerrada) esteve presente;
 //   o tipo (linha/goleiro) é o do snapshot daquela pelada (o mesmo atleta pode ter os dois históricos);
-// - pagamento do dia: `session.payments[pid]` = 'pix' | 'card' | 'exempt' (sem registro = pendente);
+// - pagamento do dia: `session.payments[pid]` = 'pix' | 'card' | 'cash' | 'exempt' (sem registro = pendente);
+//   antes do sorteio, o que foi marcado na chamada fica em `setup.payments` e passa para a pelada no sorteio;
 // - aportes livres, chave Pix, QR Code e modo teste: `settings.finance` (ajustes do grupo na nuvem).
 // Valores em centavos (inteiros) para não haver erro de arredondamento.
 import { RuleError, clone, validate } from './session.js';
@@ -542,4 +543,84 @@ export function resetCycle({ sessions = [], finance = {}, confirm }, now = new D
     finance: { ...finance, contributions: [], partySettlements: [], mode: 'official', cycleStart: now, cycles: [] },
     removed: resetPreview(sessions, finance),
   };
+}
+
+// ---------------------------------------------------------------- pagamento na chamada (RN-139)
+
+/** Formas de pagamento oferecidas na chamada (botões rápidos). Isento fica só na aba Caixa. */
+export const CALL_PAYMENT_METHODS = ['pix', 'card', 'cash'];
+
+/**
+ * Marca/desmarca a forma de pagamento de um atleta de linha na chamada, antes do sorteio (RN-139).
+ * Tocar de novo na forma já marcada volta para pendente. Devolve um mapa novo (não altera o recebido).
+ */
+export function toggleCallPayment(payments = {}, pid, method) {
+  if (!CALL_PAYMENT_METHODS.includes(method)) throw new RuleError('Forma de pagamento inválida.');
+  const out = { ...payments };
+  if (out[pid] === method) delete out[pid];
+  else out[pid] = method;
+  return out;
+}
+
+/** Mantém só os pagamentos da chamada de quem continua marcado (desmarcou → volta a pendente). */
+export function keepCallPayments(payments = {}, selectedIds = []) {
+  const sel = new Set(selectedIds);
+  return Object.fromEntries(Object.entries(payments).filter(([pid, m]) => sel.has(pid) && CALL_PAYMENT_METHODS.includes(m)));
+}
+
+/**
+ * Pagamentos que a pelada recebe no sorteio: os já registrados nela (refazer sorteio) e os da chamada,
+ * só de atletas de LINHA presentes no snapshot (goleiro é isento, RN-119).
+ */
+export function drawPayments(snapshot = {}, callPayments = {}, sessionPayments = {}) {
+  const out = {};
+  for (const [pid, m] of Object.entries({ ...callPayments, ...sessionPayments })) {
+    const p = snapshot[pid];
+    if (!p || !PAYMENT_METHODS[m]) continue;
+    if (p.type === 'gk' && m !== 'exempt') continue;
+    out[pid] = m;
+  }
+  return out;
+}
+
+// ---------------------------------------------------------------- fechamento de caixa (RN-140)
+
+/**
+ * Relatório de fechamento de caixa do dia: por forma (quantidade e valor), pendentes (lista) e soma geral,
+ * conferida com o esperado dos atletas de linha presentes (isentos não entram no esperado).
+ */
+export function cashReport(s) {
+  const sum = paymentSummary(s);
+  const line = sum.rows.filter((r) => r.type === 'line');
+  const methods = CALL_PAYMENT_METHODS.map((m) => {
+    const count = line.filter((r) => r.method === m).length;
+    return { method: m, label: PAYMENT_METHODS[m], count, cents: count * FINANCE_RULES.lineFee };
+  });
+  const pending = line.filter((r) => !r.method).map((r) => ({ pid: r.pid, name: r.name }));
+  const total = methods.reduce((a, m) => a + m.cents, 0);
+  const expected = sum.expected;
+  return {
+    methods,
+    pending,
+    pendingCents: pending.length * FINANCE_RULES.lineFee,
+    lineCount: line.length,
+    exemptLine: line.filter((r) => r.method === 'exempt').length,
+    goalkeepers: sum.rows.filter((r) => r.type === 'gk').length,
+    total,
+    expected,
+    difference: expected - total,
+    balanced: total === expected,
+  };
+}
+
+/**
+ * Onde fica o pagamento de um atleta mostrado na chamada (RN-139): se ele já está na pelada em rascunho ou
+ * ao vivo, é o pagamento da própria pelada (`sid`); senão, o da chamada (vai para a pelada no sorteio).
+ * Pelada encerrada não é editada pela chamada (use a aba Caixa), para não misturar com a próxima.
+ */
+export function callPaymentOf(callPayments = {}, session, pid) {
+  if (session && (session.status === 'draft' || session.status === 'live') && session.snapshot?.[pid]) {
+    return { sid: session.id, method: paymentOf(session, pid) };
+  }
+  return { sid: null, method: callPayments[pid] || null };
 }

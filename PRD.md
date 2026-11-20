@@ -697,6 +697,18 @@ Proteções da auditoria de ponto cego (pedido do dono em 2026-11-20):
   não mudou no meio (senão o app lê e mescla de novo). Enquanto o `schema.sql` novo não for rodado no Supabase, o
   app mescla do mesmo jeito e grava pela função antiga. Pagamentos e resultados de jogo continuam com o controle
   por pelada (RN-115).
+- **RN-139 — Pagamento na chamada** *(2026-11-20)*. Na tela de chamada/presença, cada atleta de **linha marcado** tem
+  na frente do nome os botões **Pix**, **Cartão** e **Dinheiro** (goleiros não têm: são isentos, RN-119). Nada
+  marcado = pendente; tocar marca (fica destacado); tocar de novo no ativo volta a pendente; tocar em outro troca.
+  Antes do sorteio, a marcação fica com a chamada (`setup.payments`, sincronizada com as configurações, RN-133) e
+  passa para a pelada no sorteio (só linha presente; desmarcar a presença descarta o pagamento). Com a pelada em
+  rascunho ou ao vivo, o botão mexe direto no pagamento da pelada (o mesmo da aba Caixa), então dá para marcar no
+  intervalo. Pelada encerrada só se ajusta pela aba Caixa (para não misturar com a chamada da próxima). Isento de
+  linha continua só na aba Caixa. Exige o PIN mestre, como todo pagamento.
+- **RN-140 — Fechamento de caixa** *(2026-11-20)*. A aba **Caixa do dia** mostra, para a pelada escolhida: por forma
+  (Pix, Cartão, Dinheiro) a quantidade de atletas e o valor; os **pendentes** (quantidade, valor e nomes) e a
+  **soma geral**, conferida com o esperado (linha presente × R$ 18, sem os isentos). Recebido + pendente = esperado;
+  com zero pendentes aparece "Caixa fechado". Cálculo em `cashReport` (domínio), sempre em centavos.
 
 ---
 
@@ -717,7 +729,7 @@ Proteções da auditoria de ponto cego (pedido do dono em 2026-11-20):
 
 ---
 
-## 18. Testes automatizados (cobertura atual: 171 testes)
+## 18. Testes automatizados (cobertura atual: 177 testes)
 
 Executar em `tests/index.html` (navegador) ou `node tests/run-node.mjs`.
 
