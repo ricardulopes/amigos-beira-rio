@@ -432,6 +432,7 @@ code { font: 13px ui-monospace, Consolas, monospace; background: var(--surface-2
 @media (min-width: 700px) { .modal-back { align-items: center; } .modal { border-radius: 20px; } }
 @keyframes up { from { transform: translateY(30px); opacity: 0; } }
 @keyframes fade { from { opacity: 0; } }
+.modal-back.still, .modal-back.still .modal { animation: none; } /* janela já aberta: sem repetir a entrada */
 
 .toast {
   position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(var(--tabbar-h) + 86px + env(safe-area-inset-bottom)); z-index: 60;

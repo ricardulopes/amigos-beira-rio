@@ -129,3 +129,34 @@ function cleanupEmpty(s, moves) {
   }
   fillField(s);
 }
+
+/** RN-147: seleção múltipla na janela Retirar — tocar adiciona; tocar de novo remove. Devolve uma lista nova. */
+export function togglePick(pids = [], pid) {
+  return pids.includes(pid) ? pids.filter((x) => x !== pid) : [...pids, pid];
+}
+
+/**
+ * RN-147: retirada em lote. Aplica a MESMA regra de removePlayer (reposição pela esteira, RN-76 a RN-78) em cadeia,
+ * um atleta por vez, na ordem em que foram selecionados; cada um vê o estado já ajustado pelo anterior. Tudo ou nada:
+ * se um falhar, nenhum é retirado.
+ */
+export function removePlayers(state, pids, reason = 'other', note = '') {
+  const list = [...new Set(pids || [])];
+  if (!list.length) throw new RuleError('Selecione ao menos um jogador.');
+  let s = state;
+  const results = [];
+  for (const pid of list) {
+    const r = removePlayer(s, pid, reason, note);
+    results.push(r);
+    s = r.state;
+  }
+  const moves = results.flatMap((r) => r.moves);
+  const summary = results.length === 1 ? results[0].summary : `${results.length} jogadores saíram: ${results.map((r) => r.removal.name).join(', ')}.`;
+  return {
+    state: s,
+    summary,
+    moves: results.length === 1 ? moves : results.flatMap((r) => [r.summary, ...r.moves]),
+    removals: results.map((r) => r.removal),
+    message: results.map((r) => r.message).join(' '),
+  };
+}

@@ -6,7 +6,7 @@ import { renderModal } from './modals.js';
 import { esc } from './dom.js';
 import {
   validatePlayer, snapshotPlayer, playerDraft, togglePosition, prepareDraw, clampLinePerTeam, clampTolerance, clampTransferQty,
-  createSession, redraw, startSession, finishSession, clockOf, resolveFinishTime, analyzeResult, registerResult, addLatePlayer, removePlayer,
+  createSession, redraw, startSession, finishSession, clockOf, resolveFinishTime, analyzeResult, registerResult, addLatePlayer, removePlayer, removePlayers, togglePick,
   transferPlayers, movePlayerInOrder, swapPlayers, moveGoalkeeper, moveGoalkeeperInLineup, setPermanence, RuleError,
   goalkeeperOrder, moveInGoalkeeperOrder, goalkeeperLineup,
   shareText, validatePinFormat, parseRoster, planRosterImport, applyRosterImport, rosterPlanSummary,
@@ -46,7 +46,11 @@ function render() {
   if (app.ui._keepScroll) window.scrollTo(0, scrollY);
   app.ui._keepScroll = true;
   const mb = document.querySelector('.modal-body');
-  if (mb && app.ui.modal && prevModalType === app.ui.modal.type) mb.scrollTop = modalScroll;
+  if (app.ui.modal && prevModalType === app.ui.modal.type) {
+    if (mb) mb.scrollTop = modalScroll;
+    // mesma janela redesenhada (ex.: tocar num atleta): sem repetir a animação de entrada, que fazia a janela "pular"
+    document.querySelector('.modal-back')?.classList.add('still');
+  }
   app.ui._renderedModal = app.ui.modal?.type || null;
 }
 app.render = render;
@@ -570,7 +574,13 @@ const actions = {
   },
 
   // ---------- retirada
-  'open-remove': () => openModal('remove', { reason: 'injury', note: '', pid: null }),
+  'open-remove': () => openModal('remove', { reason: 'injury', note: '', pids: [] }),
+  // RN-147: seleção múltipla — tocar adiciona, tocar de novo remove
+  'rm-pick': (d) => {
+    const m = app.ui.modal;
+    m.pids = togglePick(m.pids || [], d.v);
+    render();
+  },
   'm-set': (d) => {
     const m = app.ui.modal;
     m[d.k] = d.v;
@@ -581,11 +591,11 @@ const actions = {
   'remove-ok': () => {
     const m = app.ui.modal;
     app.ui.modal = null;
-    // A reposição é automática, em cascata pela fila (RN-76 a RN-78).
-    const res = exec('Retirada', (s) => removePlayer(s, m.pid, m.reason, m.note), { silent: true });
+    // A reposição é automática, em cascata pela fila (RN-76 a RN-78); em lote, um por vez na ordem tocada (RN-147).
+    const res = exec(m.pids.length > 1 ? 'Retirada em lote' : 'Retirada', (s) => removePlayers(s, m.pids, m.reason, m.note), { silent: true });
     if (!res) return;
     if (res.moves.length) {
-      app.ui.modal = { type: 'info', title: 'Saída aplicada', text: res.summary, list: res.moves, after: 'Se foi engano, use "Desfazer".' };
+      app.ui.modal = { type: 'info', title: m.pids.length > 1 ? 'Saídas aplicadas' : 'Saída aplicada', text: res.summary, list: res.moves, after: 'Se foi engano, use "Desfazer" (desfaz o lote inteiro).' };
       render();
     } else toast(res.message, 'ok');
   },

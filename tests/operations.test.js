@@ -2,7 +2,7 @@
 import { suite, test, assert } from './harness.js';
 import { mkSession, pids, lateSnap } from './helpers.js';
 import {
-  addLatePlayer, removePlayer, simulateTransfer, transferPlayers,
+  addLatePlayer, removePlayer, removePlayers, togglePick, simulateTransfer, transferPlayers,
   validate, registerResult, isComplete, movePlayerInOrder, moveGoalkeeper, playerStats, linePositions, positionOf,
 } from '../src/domain/index.js';
 import { createStore } from '../src/storage/storage.js';
@@ -285,5 +285,50 @@ suite('Cadastro e persistência — seções 2, 3 e 24', () => {
     const i1 = lines.findIndex((l) => l.startsWith('1. T1-5'));
     assert.ok(i5 >= 0 && i1 > i5, 'Time 1: posição 5 (topo) antes da posição 1 (base)');
     assert.ok(lines[i1].includes('sai 1º'));
+  });
+});
+
+suite('Retirada em lote (RN-147)', () => {
+  test('Seleção múltipla: tocar acumula; tocar de novo desmarca', () => {
+    let sel = togglePick([], 'a');
+    sel = togglePick(sel, 'b');
+    assert.deepEqual(sel, ['a', 'b'], 'acumula na ordem dos toques');
+    const before = [...sel];
+    sel = togglePick(sel, 'a');
+    assert.deepEqual(sel, ['b']);
+    assert.deepEqual(before, ['a', 'b'], 'não altera a lista recebida');
+  });
+
+  test('Lote = a mesma regra de um por vez, em cadeia, na ordem selecionada (mesmo time e times diferentes)', () => {
+    const s0 = mkSession([5, 5, 5, 5, 3]);
+    const picks = ['T1P2', 'T3P1', 'T1P4'];
+    const lote = removePlayers(s0, picks, 'injury', 'pancada');
+    let seq = s0;
+    for (const p of picks) seq = removePlayer(seq, p, 'injury', 'pancada').state;
+    const teamsOf = (s) => Object.fromEntries(Object.entries(s.teams).map(([id, t]) => [id, t.line.map((x) => x.pid)]));
+    assert.deepEqual(teamsOf(lote.state), teamsOf(seq), 'mesma composição de um por vez');
+    assert.deepEqual(lote.state.field, seq.field);
+    assert.deepEqual(lote.state.queue, seq.queue);
+    for (const p of picks) assert.ok(!lote.state.active.includes(p));
+    assert.deepEqual(lote.removals.map((x) => x.pid), picks);
+    assert.equal(lote.state.removed.length, 3);
+    assert.ok(lote.state.removed.every((x) => x.reason === 'injury' && x.note === 'pancada'));
+    assert.ok(isComplete(lote.state, lote.state.teams.t1), 'Time 1 reposto pela esteira');
+    assert.ok(isComplete(lote.state, lote.state.teams.t3), 'PRO reposto pelo RE');
+    assert.ok(/3 jogadores saíram/.test(lote.summary));
+    validate(lote.state);
+    const total = (s) => Object.values(s.teams).reduce((a, t) => a + t.line.length, 0);
+    assert.equal(total(lote.state), total(s0) - 3, 'saem exatamente 3 da linha');
+  });
+
+  test('Tudo ou nada: um inválido cancela o lote; lista vazia é recusada; estado original intacto', () => {
+    const s0 = mkSession([5, 5, 5]);
+    const before = JSON.stringify(s0);
+    assert.throws(() => removePlayers(s0, ['T1P1', 'ninguem']), /não está participando/);
+    assert.throws(() => removePlayers(s0, []), /Selecione/);
+    assert.equal(JSON.stringify(s0), before);
+    const one = removePlayers(s0, ['T2P3']);
+    assert.equal(one.removals.length, 1);
+    assert.equal(one.summary, removePlayer(s0, 'T2P3').summary, 'um só: mesmo texto de antes');
   });
 });

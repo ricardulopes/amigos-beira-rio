@@ -225,6 +225,8 @@ aparecem as 8 últimas e o botão "Ver todos". A explicação detalhada de cada 
   no último time da fila. Se alguém da fila desiste, só os times de trás sobem. Goleiro que sai é reposto
   pelo goleiro que aguarda time (sem ninguém aguardando, o time fica sem goleiro até chegar um). Nenhuma escolha
   manual; dá para desfazer.
+- **Retirar vários de uma vez:** na janela Retirar, toque em todos que vão sair (de um ou de vários times; toque de novo
+  desmarca) e confirme "Retirar (N)". A reposição segue a mesma esteira, um por vez, na ordem dos toques; Desfazer volta o lote.
 - Editar o cadastro nunca altera peladas anteriores (cada pelada guarda um snapshot dos jogadores).
 
 ## Previsto para o futuro

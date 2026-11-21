@@ -321,18 +321,21 @@ function lateModal(s, m) {
 
 function removeModal(s, m) {
   const teams = allTeamsInOrder(s);
+  const picks = m.pids || [];
+  const sel = new Set(picks); // RN-147: seleção múltipla
   const body = `
     <div class="field"><span>Motivo</span><div class="chips">${Object.entries(REMOVAL_REASONS).map(([k, v]) => `<button class="chip ${m.reason === k ? 'on' : ''}" data-act="m-set" data-k="reason" data-v="${k}">${v}</button>`).join('')}</div></div>
     <label class="field"><span>Observação (opcional)</span><input data-input="m:note" value="${esc(m.note || '')}" maxlength="80"></label>
-    <div class="field"><span>Jogador</span></div>
+    <div class="field"><span>Jogadores</span></div>
+    <p class="muted small">Toque em todos que vão sair (de um ou de vários times); toque de novo para desmarcar.${picks.length ? ` <b>${picks.length} selecionado(s):</b> ${picks.map((p) => esc(s.snapshot[p]?.name || p)).join(', ')}.` : ''}</p>
     ${teams.map((t) => `<div class="pick-team"><div class="muted small">${esc(t.label)} · ${queueLabel(s, t.id)}</div><div class="chips">
-        ${t.gks.map((g) => `<button class="chip ${m.pid === g ? 'on' : ''}" data-act="m-set" data-k="pid" data-v="${g}">🧤 ${esc(s.snapshot[g].name)}</button>`).join('')}
-        ${t.line.map((x) => `<button class="chip ${m.pid === x.pid ? 'on' : ''}" data-act="m-set" data-k="pid" data-v="${x.pid}">${esc(s.snapshot[x.pid].name)}</button>`).join('')}
+        ${t.gks.map((g) => `<button class="chip ${sel.has(g) ? 'on' : ''}" data-act="rm-pick" data-v="${g}" aria-pressed="${sel.has(g)}">🧤 ${esc(s.snapshot[g].name)}</button>`).join('')}
+        ${t.line.map((x) => `<button class="chip ${sel.has(x.pid) ? 'on' : ''}" data-act="rm-pick" data-v="${x.pid}" aria-pressed="${sel.has(x.pid)}">${esc(s.snapshot[x.pid].name)}</button>`).join('')}
       </div></div>`).join('')}
-    ${s.bench.length ? `<div class="pick-team"><div class="muted small">Reserva</div><div class="chips">${s.bench.map((g) => `<button class="chip ${m.pid === g ? 'on' : ''}" data-act="m-set" data-k="pid" data-v="${g}">🧤 ${esc(s.snapshot[g].name)}</button>`).join('')}</div></div>` : ''}
-    ${s.gkQueue?.length ? `<div class="pick-team"><div class="muted small">Fila de goleiros</div><div class="chips">${s.gkQueue.map((g) => `<button class="chip ${m.pid === g ? 'on' : ''}" data-act="m-set" data-k="pid" data-v="${g}">🧤 ${esc(s.snapshot[g].name)}</button>`).join('')}</div></div>` : ''}
+    ${s.bench.length ? `<div class="pick-team"><div class="muted small">Reserva</div><div class="chips">${s.bench.map((g) => `<button class="chip ${sel.has(g) ? 'on' : ''}" data-act="rm-pick" data-v="${g}" aria-pressed="${sel.has(g)}">🧤 ${esc(s.snapshot[g].name)}</button>`).join('')}</div></div>` : ''}
+    ${s.gkQueue?.length ? `<div class="pick-team"><div class="muted small">Fila de goleiros</div><div class="chips">${s.gkQueue.map((g) => `<button class="chip ${sel.has(g) ? 'on' : ''}" data-act="rm-pick" data-v="${g}" aria-pressed="${sel.has(g)}">🧤 ${esc(s.snapshot[g].name)}</button>`).join('')}</div></div>` : ''}
     <p class="muted small">A vaga é reposta automaticamente pela esteira da fila: a posição 1 do Próximo entra no topo da equipe que perdeu o jogador, o Ré completa o Próximo, o Tri completa o Ré, e assim por diante; a vaga termina no último da fila. Goleiro é reposto pelo próximo goleiro da fila. Vale só para esta pelada; o cadastro não muda.</p>`;
-  return shell('Retirar jogador', body, `<button class="btn" data-act="modal-close">Cancelar</button><button class="btn danger" data-act="remove-ok" ${m.pid ? '' : 'disabled'}>Retirar</button>`, 'tall');
+  return shell('Retirar jogadores', body, `<button class="btn" data-act="modal-close">Cancelar</button><button class="btn danger" data-act="remove-ok" ${picks.length ? '' : 'disabled'}>Retirar${picks.length > 1 ? ` (${picks.length})` : ''}</button>`, 'tall');
 }
 
 // --------------------------------------------------------------- transferência

@@ -40,7 +40,7 @@ export { SCENARIOS, fieldSituation, analyzeResult, drawHint, advantageStatus } f
 export { registerResult, vestPreview } from './rotation.js';
 export { VESTS, VEST_ORDER, vestOf, vestName, incomingVest, vestsText, ensureVests } from './vests.js';
 export { addLatePlayer } from './arrivals.js';
-export { removePlayer } from './removals.js';
+export { removePlayer, removePlayers, togglePick } from './removals.js';
 export { simulateTransfer, transferPlayers, movePlayerInOrder, swapPlayers, moveGoalkeeper, moveGoalkeeperInLineup, setPermanence } from './adjustments.js';
 export { balanceWarnings, BALANCE_THRESHOLDS } from './balance.js';
 export {
