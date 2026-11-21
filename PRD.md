@@ -484,6 +484,7 @@ completam o 5º time; os dois seguintes abrem o 6º; o quinto atrasado entra no 
 > **Decisão (2026-11-18, pedido do dono):** a sugestão manual de reposição por posição/estrelas foi
 > substituída pela cascata automática. Interpretação adotada: "topo da fila" = posição 1 da equipe
 > (próximo a sair) e "fim do Próximo" = vaga de cima, como no rodízio.
+
 - **RN-147 — Retirada em lote** *(2026-11-21)*. A janela "Retirar jogadores" aceita **vários atletas** (de um time ou de
   vários): tocar adiciona, tocar de novo desmarca; o botão mostra "Retirar (N)". O motivo e a observação valem para
   todos. A retirada aplica a mesma regra de um por vez (RN-76 a RN-78/RN-137), **em cadeia, na ordem em que foram
