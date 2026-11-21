@@ -102,6 +102,7 @@ será zerado antes do ciclo oficial.
 - **Na chamada (admin):** na frente de cada atleta de linha marcado há **Pix / Cartão / Dinheiro**. Toque para marcar,
   toque de novo para voltar a pendente. Vale antes do sorteio (vai junto para a pelada) e durante a pelada (intervalo).
   Goleiros não têm botões (isentos).
+- A chamada não "pula": marcar presença, pagamento ou ordem dos goleiros atualiza só o item tocado, que fica parado sob o dedo.
 - **Admin (PIN mestre):** **Caixa do dia** (marcar Pix, Cartão, Dinheiro ou Isento de cada atleta, com o **fechamento de
   caixa**: atletas e valor por forma, pendentes com nomes e soma geral conferida com o esperado; atalho
   "💰 Pagamentos" no sorteio e em "⋯ Mais" na partida), **Aportes** e, em **Ajustes → Financeiro e Pix**,

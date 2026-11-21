@@ -148,13 +148,13 @@ export function setupView() {
     ${gkSection}
 
     <h2 class="section-title">Jogadores de linha</h2>
-    <section class="counters">
+    <div id="setup-sum" data-patch><section class="counters">
       <div><b>${nLine}</b><span>linha</span></div>
       <div><b>${teamCount}</b><span>equipes</span></div>
       <div><b>${full}</b><span>completas</span></div>
       <div><b>${rem || 0}</b><span>em formação</span></div>
     </section>
-    <p class="plan-text">${nLine ? `${full} equipe(s) completa(s) de ${n}${rem ? ` + 1 em formação com ${rem}` : ''}.` : 'Marque os jogadores de linha presentes.'}</p>
+    <p class="plan-text">${nLine ? `${full} equipe(s) completa(s) de ${n}${rem ? ` + 1 em formação com ${rem}` : ''}.` : 'Marque os jogadores de linha presentes.'}</p></div>
 
     <div class="list-head">
       <input id="ssearch" class="search" type="search" placeholder="Buscar presente" value="${esc(app.ui.setupQuery)}" data-input="ssearch" autocomplete="off">
@@ -162,7 +162,7 @@ export function setupView() {
       <button class="btn small ghost" data-act="setup-none">Limpar</button>
     </div>
     <ul class="list check-list">
-      ${players.map((p) => `<li class="row ${sel.has(p.id) ? 'checked has-pay' : ''}" data-act="setup-toggle" data-id="${p.id}">
+      ${players.map((p) => `<li class="row ${sel.has(p.id) ? 'checked has-pay' : ''}" id="srow-${esc(p.id)}" data-patch data-act="setup-toggle" data-id="${p.id}">
           <span class="check" role="checkbox" aria-checked="${sel.has(p.id)}"></span>
           <div class="grow"><div class="name">${esc(p.name)}</div><div class="badges">${positionsBadges(p)}</div></div>
           ${stars(p.stars)}
@@ -171,7 +171,7 @@ export function setupView() {
     </ul>
     <button class="btn ghost wide" data-act="player-new" data-select="1">+ Cadastrar jogador e marcar presença</button>
   </main>
-  <div class="cta-bar"><button class="btn primary big wide" data-act="do-draw" ${!nLine || blocked ? 'disabled' : ''}>SORTEAR ${teamCount ? `${teamCount} EQUIPES` : ''}</button></div>`;
+  <div class="cta-bar" id="setup-cta" data-patch><button class="btn primary big wide" data-act="do-draw" ${!nLine || blocked ? 'disabled' : ''}>SORTEAR ${teamCount ? `${teamCount} EQUIPES` : ''}</button></div>`;
 }
 
 /** RN-139: Pix / Cartão / Dinheiro na frente de cada atleta de linha marcado. Nada marcado = pendente. */
@@ -198,7 +198,7 @@ function goalkeeperCallSection(marked, teamCount) {
       <button class="mini" data-act="gk-order" data-pid="${esc(x.pid)}" data-d="1" ${i === preview.length - 1 ? 'disabled' : ''} aria-label="Chegou depois">▼</button>
       <button class="mini" data-act="gk-del" data-pid="${esc(x.pid)}" aria-label="Desmarcar">✕</button></li>`).join('');
   const rest = app.db.players.filter((p) => p.type === 'gk' && !ids.has(p.id));
-  return `<section class="card gk-order">
+  return `<section class="card gk-order" id="gk-call" data-patch>
       <h3 class="small">🧤 Ordem de chegada dos goleiros</h3>
       ${rows ? `<ul class="plist editable">${rows}</ul>` : '<p class="muted small">Nenhum goleiro marcado ainda. Toque em quem for chegando.</p>'}
       <div class="chips">${rest.map((p) => `<button class="chip" data-act="gk-add" data-pid="${esc(p.id)}">+ 🧤 ${esc(p.name)}</button>`).join('')

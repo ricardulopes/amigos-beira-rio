@@ -30,7 +30,10 @@ function render() {
   const modalScroll = modalBody ? modalBody.scrollTop : 0;
   const prevModalType = app.ui._renderedModal;
 
-  root.innerHTML = view() + tabbar() + renderModal() + (app.ui.toast ? `<div id="toast" class="toast ${app.ui.toast.kind}" role="status">${esc(app.ui.toast.text)}</div>` : '');
+  const html = view() + tabbar() + renderModal() + (app.ui.toast ? `<div id="toast" class="toast ${app.ui.toast.kind}" role="status">${esc(app.ui.toast.text)}</div>` : '');
+  if (patchRender(html)) return;
+  root.innerHTML = html;
+  app.ui._anchor = null;
   document.body.classList.toggle('modal-open', !!app.ui.modal);
 
   if (fid) {
@@ -47,6 +50,39 @@ function render() {
   app.ui._renderedModal = app.ui.modal?.type || null;
 }
 app.render = render;
+
+/** Esqueleto da tela: o HTML com cada região [data-patch] trocada por um marcador com o id dela. */
+function skeletonOf(container) {
+  const c = document.createElement('div');
+  for (const n of container.childNodes) c.append(n.cloneNode(true)); // serve para elemento e para template.content
+  for (const n of c.querySelectorAll('[data-patch]')) n.replaceWith(document.createComment(n.id));
+  return c.innerHTML;
+}
+
+/**
+ * Atualização local (sem "pulo" na tela de chamada): se só mudaram regiões marcadas com data-patch (linha do jogador,
+ * goleiros, resumo, botão Sortear), troca apenas essas regiões, sem recriar a página. O item tocado fica parado sob o
+ * dedo: a rolagem compensa qualquer mudança de altura acima dele. Qualquer outra diferença → render completo.
+ */
+function patchRender(html) {
+  if (!root.querySelector('[data-patch]')) return false;
+  const tpl = document.createElement('template');
+  tpl.innerHTML = html;
+  if (skeletonOf(tpl.content) !== skeletonOf(root)) return false;
+  const anchor = app.ui._anchor && document.getElementById(app.ui._anchor.id);
+  const top = anchor ? anchor.getBoundingClientRect().top : null;
+  for (const next of [...tpl.content.querySelectorAll('[data-patch]')]) {
+    const cur = document.getElementById(next.id);
+    if (!cur) return false;
+    if (cur.outerHTML !== next.outerHTML) cur.replaceWith(next);
+  }
+  if (top !== null) {
+    const now = document.getElementById(app.ui._anchor.id);
+    if (now) window.scrollBy(0, now.getBoundingClientRect().top - top);
+  }
+  app.ui._anchor = null;
+  return true;
+}
 
 function view() {
   const r = app.ui.route;
@@ -957,6 +993,9 @@ document.addEventListener('click', (ev) => {
   const fn = actions[act];
   if (!fn) return;
   if (el.tagName === 'A') ev.preventDefault();
+  // região tocada (para manter o item parado sob o dedo na atualização local)
+  const region = el.closest('[data-patch]');
+  app.ui._anchor = region ? { id: region.id } : null;
   if (!FREE_ACTIONS.has(act) && !adminActive()) {
     const data = { ...el.dataset };
     return withAdmin('pelada', () => fn(data, el, ev));
