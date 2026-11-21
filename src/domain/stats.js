@@ -92,13 +92,16 @@ function miniTeam(g, t, kind, outcome) {
 
 /**
  * RN-144: mural da aba Jogos do histórico — um quadrante por jogo com os DOIS times como jogaram (retrato do apito).
- * Vencedor: 'win' (limpo); perdedor: 'loss' (vermelho); empate: os dois 'draw' (turquesa), mesmo que um tenha ficado.
+ * Vencedor: 'win' (limpo); perdedor: 'loss' (vermelho). Empate: quem SAIU de campo é 'draw' (turquesa, com X); quem
+ * permaneceu (par ou ímpar, desafiante, quem entrou primeiro) é 'drawStay' (limpo). Saída dupla: os dois 'draw'.
  */
 export function gameBoard(s) {
   return (s.games || []).filter((g) => g.teamA && g.teamB).map((g) => {
     const draw = g.result === 'draw';
     const winner = g.result === 'A' ? g.teamA : g.result === 'B' ? g.teamB : null;
-    const kind = (t) => (draw ? 'draw' : t === winner ? 'win' : 'loss');
+    // X só para quem saiu de campo (game.leaving); jogo antigo sem esse registro: empate marca os dois.
+    const left = (t) => (Array.isArray(g.leaving) ? g.leaving.includes(t.label) : true);
+    const kind = (t) => (draw ? (left(t) ? 'draw' : 'drawStay') : t === winner ? 'win' : 'loss');
     const tossBy = g.toss ? [g.teamA, g.teamB].find((t) => t.id === g.toss)?.label : null;
     return {
       n: g.n,

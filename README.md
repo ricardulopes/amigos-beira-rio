@@ -210,7 +210,8 @@ aparecem as 8 últimas e o botão "Ver todos". A explicação detalhada de cada 
   e de **goleiros**: presenças, jogos, V-E-D, pontos (3-1-0), aproveitamento e maior sequência de vitórias (goleiros:
   jogos sem perder). Ordena por pontos, aproveitamento (mínimo de 3 jogos para o topo) ou presença. Sem gols: o app não os registra.
 - Histórico → aba **Jogos**: mural com um quadrante por jogo (2 por linha) e as miniaturas dos dois times como jogaram.
-  Vencedor limpo; perdedor com borda e X vermelhos; empate com os dois em turquesa. Os textos detalhados ficam em Movimentações.
+  Vencedor limpo; perdedor com borda e X vermelhos. No empate, o X turquesa vai só em quem saiu de campo (os dois, na saída
+  dupla); quem ficou aparece limpo. Os textos detalhados ficam em Movimentações.
 - Atrasado de linha entra na base da última equipe da fila se houver vaga; senão abre nova equipe.
   Goleiro atrasado vai para o próximo time da sequência sem goleiro (se todos tiverem, aguarda time).
 - Saída por lesão, cansaço ou desistência: a vaga é reposta **automaticamente**, na mesma esteira de

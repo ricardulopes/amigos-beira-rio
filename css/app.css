@@ -537,3 +537,4 @@ button.tile { text-align: left; font: inherit; width: 100%; cursor: pointer; }
 .quad .mini .rl { width: 11px; height: 11px; font-size: 7.5px; margin-right: 1px; }
 .quad-teams { gap: 2px; }
 .quad { padding: 3px; }
+.mini.k-drawStay { border-color: var(--line); }

@@ -397,15 +397,34 @@ suite('Mural da aba Jogos do histórico (RN-144)', () => {
     assert.equal(t4.sum, 10);
   });
 
-  test('Empate em que um time fica: os dois aparecem como empate; retrato não muda com o rodízio', () => {
+  test('Empate em que um time fica: só quem saiu leva o X; quem permaneceu fica limpo; retrato não muda', () => {
     let s = mkSession([5, 5, 5, 2]);
     s = R(s, 'A');
     s = R(s, 'draw'); // desafiante fica
     const first = JSON.stringify(gameBoard(s)[0]);
     s = R(s, 'A');
     s = R(s, 'B');
-    assert.deepEqual(gameBoard(s)[1].teams.map((t) => t.kind), ['draw', 'draw']);
+    assert.deepEqual(gameBoard(s)[1].teams.map((t) => [t.label, t.kind]), [['Time 1', 'draw'], ['Time 3', 'drawStay']], 'desafiante Time 3 ficou');
     assert.equal(JSON.stringify(gameBoard(s)[0]), first);
     assert.deepEqual(gameBoard({ games: [] }), []);
+  });
+});
+
+suite('Mural: X só em quem saiu no empate (RN-144)', () => {
+  const R = (s, r, o) => registerResult(s, r, o).state;
+  test('1º jogo empatado sem saída dupla: vencedor do par ou ímpar fica limpo, o outro leva o X', () => {
+    const s = R(mkSession([5, 5, 5]), 'draw', { tossWinner: 't2' });
+    assert.deepEqual(gameBoard(s)[0].teams.map((t) => [t.label, t.kind]), [['Time 1', 'draw'], ['Time 2', 'drawStay']]);
+  });
+  test('Empate com saída dupla (2º jogo em diante): X nos dois', () => {
+    let s = mkSession([5, 5, 5, 5, 5, 5]);
+    s = R(s, 'draw', { tossWinner: 't1' });
+    s = R(s, 'draw'); // Time 3 x Time 4 com PRO e RE completos
+    assert.deepEqual(gameBoard(s)[1].teams.map((t) => t.kind), ['draw', 'draw']);
+  });
+  test('Jogo antigo sem registro de quem saiu: empate marca os dois (comportamento anterior)', () => {
+    const s = R(mkSession([5, 5, 5]), 'draw', { tossWinner: 't2' });
+    delete s.games[0].leaving;
+    assert.deepEqual(gameBoard(s)[0].teams.map((t) => t.kind), ['draw', 'draw']);
   });
 });

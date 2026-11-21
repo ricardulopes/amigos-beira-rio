@@ -394,7 +394,7 @@ function miniCard(m) {
       <header><b>${esc(m.label)}</b><span class="msum">${m.vest ? vestIcon(m.vest, 'sm') : ''}${fmt(m.sum)}★</span></header>
       <ul>${gk}${rows}</ul>
       ${m.outcome ? `<span class="mtag">${esc(m.outcome)}</span>` : ''}
-      ${m.kind === 'win' ? '' : '<span class="mx" aria-hidden="true"></span>'}
+      ${m.kind === 'win' || m.kind === 'drawStay' ? '' : '<span class="mx" aria-hidden="true"></span>'}
     </article>`;
 }
 

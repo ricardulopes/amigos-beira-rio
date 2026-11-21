@@ -545,8 +545,10 @@ completam o 5º time; os dois seguintes abrem o 6º; o quinto atrasado entra no 
   em "Movimentações"). Cada jogo vira um **quadrante** com "Jogo N" e o desfecho curto ("Vitória Time X", "Empate" e,
   no 1º jogo, quem venceu o par ou ímpar) e as miniaturas dos **dois times** como jogaram (retrato do apito: colete,
   estrelas, goleiro, G/D/M/A, nomes e estrelas). 2 quadrantes por linha = 4 miniaturas na largura do celular.
-  Vencedor: limpo, borda azul; perdedor: borda e X vermelhos; empate: os dois com borda e X turquesa (mesmo quando um
-  time ficou em campo). Nomes não são cortados: quebram só entre palavras. Cálculo em `gameBoard` (domínio).
+  Vencedor: limpo, borda azul; perdedor: borda e X vermelhos. Empate *(ajuste de 2026-11-21)*: o X marca só quem **saiu de
+  campo** — na saída dupla, os dois com borda e X turquesa; quando um time ficou (par ou ímpar, desafiante, quem entrou
+  primeiro), ele aparece limpo e só o que saiu leva o X turquesa. Quem saiu vem do registro do jogo (`game.leaving`);
+  jogo antigo sem esse registro marca os dois. Nomes não são cortados: quebram só entre palavras. Cálculo em `gameBoard` (domínio).
 
 ---
 
@@ -759,7 +761,7 @@ Proteções da auditoria de ponto cego (pedido do dono em 2026-11-20):
 
 ---
 
-## 18. Testes automatizados (cobertura atual: 191 testes)
+## 18. Testes automatizados (cobertura atual: 194 testes)
 
 Executar em `tests/index.html` (navegador) ou `node tests/run-node.mjs`.
 
