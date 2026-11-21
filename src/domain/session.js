@@ -248,8 +248,16 @@ export function allTeamsInOrder(s) {
   return [...s.field, ...s.queue].map((id) => s.teams[id]);
 }
 
+// RN-142: retrato congelado do sorteio, com nome e estrelas de cada vaga (não depende do snapshot atual da pelada).
 function snapshotTeams(s) {
-  return allTeamsInOrder(s).map((t) => ({ id: t.id, label: t.label, line: clone(t.line), gks: [...t.gks] }));
+  const who = (pid) => ({ name: s.snapshot[pid]?.name ?? null, stars: s.snapshot[pid]?.stars ?? null });
+  return allTeamsInOrder(s).map((t) => ({
+    id: t.id,
+    label: t.label,
+    line: t.line.map((x) => ({ pid: x.pid, role: x.role, ...who(x.pid) })),
+    gks: [...t.gks],
+    gkInfo: t.gks.map((pid) => ({ pid, ...who(pid) })),
+  }));
 }
 
 /** Escalação completa (com nome e estrelas) para registros de histórico. */

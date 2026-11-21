@@ -5,7 +5,7 @@ import { cloud, adminUntil } from '../cloud/sync.js';
 import {
   filterPlayers, ROLE_NAMES, REMOVAL_REASONS, STAR_VALUES, LIMITS, planParticipation, toleranceInfo, defaultTitle as domainDefaultTitle,
   ADMIN_ACTIONS, PUBLIC_ACTIONS, allTeamsInOrder, queueLabel, teamStats, isComplete, linePositions, playerStats, balanceSummary, gamesSummary, teamExitGroups, drawHint, advantageStatus,
-  vestOf, vestName, incomingVest, outGallery,
+  vestOf, vestName, incomingVest, outGallery, drawLineup,
   financeSettings, cyclesAvailable, cycleRanking, cycleList, NEXT_CYCLE, statement, paymentSummary, formatMoney, PAYMENT_METHODS, FINANCE_RULES,
   CALL_PAYMENT_METHODS, callPaymentOf, cashReport,
   groupCashback, closedCycleOf, reopenInfo, financeAthletes, usesGkQueue, goalkeeperPreview,
@@ -443,13 +443,15 @@ export function historyDetailView(id) {
     const gs = gamesSummary(s);
     body = `<p class="muted small">${gs.games} jogos · ${gs.wins} vitórias · ${gs.draws} empates</p>` + (s.games.map((g) => `<div class="card small">${gameLine(g)}</div>`).join('') || '<p class="muted">Nenhum jogo registrado.</p>');
   } else if (tab === 'draw') {
-    const d = s.draws[0];
+    // RN-142: mostra o sorteio que valeu (o último), com o retrato congelado e recuperação pelos jogos.
+    const d = drawLineup(s);
+    const nm = (x) => (x.name ? esc(x.name) : '<span class="muted">(sem registro)</span>');
     body = d
-      ? d.teams.map((t) => `<div class="card small"><b>${esc(t.label)}</b>${t.gks.length ? ` · 🧤 ${t.gks.map((g) => esc(s.snapshot[g]?.name)).join(', ')}` : ''}<ul class="plist">${linePositions(t)
-          .reverse()
-          .map((x) => `<li class="prow">${posBadge(x.position)}<span class="pname">${esc(s.snapshot[x.pid]?.name)}</span> ${roleBadge(x.role)} ${stars(s.snapshot[x.pid]?.stars || 0, 'sm')}</li>`)
-          .join('')}</ul></div>`).join('') + `<p class="muted small">Sorteios realizados antes do início: ${s.draws.length}.</p>`
-      : '';
+      ? d.teams.map((t) => `<div class="card small"><b>${esc(t.label)}</b>${t.gks.length ? ` · 🧤 ${t.gks.map(nm).join(', ')}` : ''}<ul class="plist">${t.line
+        .map((x) => `<li class="prow">${posBadge(x.position)}<span class="pname">${nm(x)}</span> ${roleBadge(x.role)} ${x.stars == null ? '' : stars(x.stars, 'sm')}</li>`)
+        .join('')}</ul></div>`).join('') +
+        `<p class="muted small">${d.total > 1 ? `Sorteio que valeu: o ${d.total}º (os ${d.total - 1} anteriores foram refeitos antes do início).` : 'Sorteio realizado antes do início.'}</p>`
+      : '<p class="muted">Sem sorteio registrado.</p>';
   } else if (tab === 'log') {
     body = `<ol class="log">${s.log.map((l) => `<li><time>${new Date(l.at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</time> ${esc(l.text)}</li>`).join('')}</ol>`;
   } else if (tab === 'players') {

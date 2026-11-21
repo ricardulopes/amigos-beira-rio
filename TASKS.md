@@ -22,7 +22,7 @@ técnicos, no [CLAUDE.md](CLAUDE.md).
 - [x] Teste de isolamento: o domínio não usa DOM/navegador/armazenamento e a interface só o acessa por `index.js`.
 - [x] Servidor local em PowerShell (`tools/serve.ps1`) e geração de ícones (`tools/make-icons.ps1`).
 - [x] Documentação: README.md, PRD.md (137 regras), CLAUDE.md, TASKS.md.
-- [x] 181 testes automatizados passando (navegador e Node).
+- [x] 185 testes automatizados passando (navegador e Node).
 - [x] Goleiros fora do sorteio; seção "Ordem de chegada dos goleiros" no topo da presença (aviso se sortear sem goleiro); um goleiro por
       time (campo e fila); perdedor leva o goleiro ao 1º time sem goleiro (RN-134 a RN-137, 2026-11-20).
 - [ ] Usar numa pelada real e revisar com o dono (5 times × 3 goleiros, atrasado, lesão, mais goleiros que times).

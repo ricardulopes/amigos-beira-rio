@@ -107,3 +107,38 @@ export function outGallery(s) {
   }
   return out;
 }
+
+/**
+ * RN-142: escalação do sorteio que VALEU (o último antes do 1º jogo; os anteriores foram refeitos), para a aba
+ * Sorteio do histórico. Nome e estrelas vêm, nesta ordem: do retrato congelado no sorteio; do snapshot da pelada;
+ * das escalações salvas nos jogos (recupera peladas antigas cujo sorteio guardava só os ids).
+ * @returns {{total, at, teams: {id, label, gks: {pid,name,stars}[], line: {pid,role,name,stars,position}[]}[], missing}|null}
+ */
+export function drawLineup(s) {
+  const draws = s.draws || [];
+  if (!draws.length) return null;
+  const d = draws[draws.length - 1];
+  const fromGames = new Map();
+  for (const g of s.games || []) {
+    for (const t of [g.teamA, g.teamB]) {
+      for (const x of [...(t?.line || []), ...(t?.gks || [])]) if (x?.pid && x.name && !fromGames.has(x.pid)) fromGames.set(x.pid, x);
+    }
+  }
+  let missing = 0;
+  const who = (pid, frozen) => {
+    const src = (frozen?.name && frozen) || (s.snapshot?.[pid]?.name && s.snapshot[pid]) || fromGames.get(pid);
+    if (!src) missing++;
+    return { pid, name: src?.name || null, stars: src?.stars ?? null };
+  };
+  const teams = d.teams.map((t) => {
+    const info = new Map((t.gkInfo || []).map((g) => [g.pid, g]));
+    return {
+      id: t.id,
+      label: t.label,
+      gks: (t.gks || []).map((pid) => who(pid, info.get(pid))),
+      // topo primeiro (como nos cards); posição contada de baixo para cima (RN-33a)
+      line: t.line.map((x, i) => ({ ...who(x.pid, x), role: x.role, position: t.line.length - i })),
+    };
+  });
+  return { total: draws.length, at: d.at, teams, missing };
+}

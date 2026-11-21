@@ -5,7 +5,7 @@ import {
   isValidStars, sumStars, mean, median, range, formatStars, starsText,
   planParticipation, goalkeeperNote, toleranceInfo, clampLinePerTeam, clampTolerance, clampTransferQty, prepareDraw, defaultTitle,
   drawHint, advantageStatus, registerResult, balanceSummary, teamExitGroups, gamesSummary,
-  playerDraft, togglePosition, RuleError, linePositions, positionOf, outGallery,
+  playerDraft, togglePosition, RuleError, linePositions, positionOf, outGallery, drawLineup, redraw, startSession, finishSession,
 } from '../src/domain/index.js';
 
 suite('Numeração de posições (de baixo para cima)', () => {
@@ -233,3 +233,75 @@ suite('Galeria dos times que saíram (RN-141)', () => {
     assert.equal(outGallery(s0).length, 0, 'o estado anterior (desfazer) continua sem miniatura');
   });
 });
+
+suite('Aba Sorteio do histórico (RN-142)', () => {
+  const R = (s, r, o) => registerResult(s, r, o).state;
+  /** Sorteio fictício montado a partir de um snapshot: equipes de 5 na ordem das chaves. */
+  const drawOf = (snap) => {
+    const line = Object.values(snap).filter((p) => p.type !== 'gk').map((p) => ({ pid: p.id, role: 'M' }));
+    const teams = [];
+    for (let i = 0; i < line.length; i += 5) teams.push({ line: line.slice(i, i + 5), gks: [] });
+    return { teams, seed: 1, metrics: {}, ref: 2, withoutGk: [], unusedGoalkeepers: [] };
+  };
+  const names = (d) => d.teams.flatMap((t) => [...t.gks, ...t.line].map((x) => x.name));
+
+  test('Sorteio refeito com outros participantes: mostra o último (o que valeu), todos com nome', () => {
+    const first = mkSession([5, 5, 5], { goalkeepers: 2 }); // 1º sorteio: T1…T3
+    const snap2 = {};
+    for (let i = 1; i <= 10; i++) snap2[`N${i}`] = { id: `N${i}`, name: `Novo ${i}`, stars: 2, type: 'line', positions: ['M'] };
+    snap2.G1 = first.snapshot.G1;
+    let s = redraw({ ...first, status: 'draft' }, { draw: drawOf(snap2), snapshots: snap2, gkOrder: ['G1'] });
+    assert.equal(s.draws.length, 2);
+    s = startSession(s);
+    s = R(s, 'A');
+    s = finishSession(s);
+    const d = drawLineup(s);
+    assert.equal(d.total, 2);
+    assert.equal(d.missing, 0);
+    assert.deepEqual(d.teams.map((t) => t.label), ['Time 1', 'Time 2']);
+    assert.ok(names(d).every(Boolean), 'nenhuma vaga em branco');
+    assert.deepEqual(d.teams[0].gks.map((g) => g.name), ['Goleiro 1'], 'goleiro aparece');
+    assert.deepEqual(d.teams[0].line.map((x) => x.name), ['Novo 1', 'Novo 2', 'Novo 3', 'Novo 4', 'Novo 5']);
+    assert.deepEqual(d.teams[0].line.map((x) => x.position), [5, 4, 3, 2, 1]);
+  });
+
+  test('Retrato congelado: jogos, divisões e encerramento não mudam o sorteio registrado', () => {
+    let s = mkSession([5, 5, 5, 3], { goalkeepers: 3 });
+    const before = JSON.stringify(drawLineup(s));
+    for (const r of ['A', 'B', 'draw', 'A', 'B']) {
+      const an = analyzeResultSafe(s, r);
+      s = R(s, r, an);
+    }
+    s = finishSession(s);
+    assert.equal(JSON.stringify(drawLineup(s)), before);
+    assert.equal(drawLineup(s).teams.length, 4);
+    assert.equal(drawLineup(s).teams[3].line.length, 3);
+  });
+
+  test('Pelada antiga (sorteio só com ids, participante fora do snapshot): recupera nome pelos jogos', () => {
+    let s = mkSession([5, 5, 5]);
+    s = R(s, 'A');
+    // simula o formato antigo: o sorteio guardava só ids e o snapshot perdeu o atleta
+    s.draws[0].teams.forEach((t) => {
+      t.line = t.line.map(({ pid, role }) => ({ pid, role }));
+      delete t.gkInfo;
+    });
+    delete s.snapshot.T2P3;
+    const d = drawLineup(s);
+    assert.equal(d.teams[1].line.find((x) => x.pid === 'T2P3').name, 'T2-3', 'veio da escalação do 1º jogo');
+    assert.equal(d.missing, 0);
+    delete s.snapshot.T3P1; // Time 3 não jogou ainda: sem fonte
+    const d2 = drawLineup(s);
+    assert.equal(d2.missing, 1);
+    assert.equal(d2.teams[2].line.find((x) => x.pid === 'T3P1').name, null);
+  });
+
+  test('Pelada sem sorteio: null', () => {
+    assert.equal(drawLineup({ draws: [] }), null);
+  });
+});
+
+/** Opções de par ou ímpar quando o resultado exige (1º jogo empatado). */
+function analyzeResultSafe(s, r) {
+  return r === 'draw' && s.games.length === 0 ? { tossWinner: s.field[0] } : {};
+}

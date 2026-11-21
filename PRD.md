@@ -526,6 +526,13 @@ completam o 5º time; os dois seguintes abrem o 6º; o quinto atrasado entra no 
   calculado dos registros dos jogos) e Participantes (dados da época, atrasados, retiradas).
 - **RN-89** O histórico nunca é alterado por edições posteriores no cadastro. Pode ser excluído
   manualmente (com confirmação).
+- **RN-142 — Aba Sorteio do histórico** *(correção de 2026-11-21)*. Mostra o **sorteio que valeu** (o último antes do
+  1º jogo; os anteriores foram refeitos e só contam no rodapé). Causa do bug: a aba lia o 1º sorteio e buscava os
+  nomes no snapshot da pelada, que é trocado a cada "Refazer sorteio" com outros participantes; quem só estava no
+  1º sorteio ficava em branco (na "Pelada de sábado", 15 de 29 vagas). Agora cada sorteio guarda um retrato
+  congelado com nome e estrelas de cada vaga (linha e goleiros). Peladas antigas são recuperadas na leitura: nome
+  e estrelas vêm do retrato, senão do snapshot da pelada, senão das escalações salvas nos jogos; sem fonte, a
+  vaga aparece como "(sem registro)". Cálculo em `drawLineup` (domínio).
 
 ---
 
@@ -738,7 +745,7 @@ Proteções da auditoria de ponto cego (pedido do dono em 2026-11-20):
 
 ---
 
-## 18. Testes automatizados (cobertura atual: 181 testes)
+## 18. Testes automatizados (cobertura atual: 185 testes)
 
 Executar em `tests/index.html` (navegador) ou `node tests/run-node.mjs`.
 
