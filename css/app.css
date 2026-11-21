@@ -3,6 +3,8 @@
 :root {
   --abr-blue: #002B7F;
   --abr-yellow: #FFD100;
+  --out-loss: #D62828;  /* RN-141: time que perdeu (borda e X) */
+  --out-draw: #00A3A3;  /* RN-141: time que empatou e saiu (turquesa) */
   --bg: #F4F6F9;
   --surface: #FFFFFF;
   --surface-2: #EEF1F6;
@@ -476,3 +478,30 @@ button.tile { text-align: left; font: inherit; width: 100%; cursor: pointer; }
 .cash-table tfoot td { font-weight: 800; border-bottom: 0; border-top: 2px solid var(--text); }
 .cash-ok { color: var(--brand-fg); font-weight: 700; }
 .cash-diff { color: var(--warn); }
+
+/* RN-141: galeria dos times que saíram (4 miniaturas por linha no celular) */
+.outs-wrap { margin: 4px 0 8px; }
+.outs { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 5px; }
+.mini { position: relative; overflow: hidden; min-width: 0; background: var(--surface); border: 2px solid var(--line); border-radius: 9px; padding: 4px 4px 3px; font-size: 9.5px; line-height: 1.25; }
+.mini.k-loss { border-color: var(--out-loss); }
+.mini.k-draw { border-color: var(--out-draw); }
+.mini header { display: flex; flex-direction: column; gap: 1px; margin-bottom: 2px; }
+.mini header b { font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.mini .msum { display: flex; align-items: center; gap: 3px; font-weight: 800; font-size: 10px; }
+.mini .msum svg, .mini .msum .vest-ico { width: 13px; height: 13px; }
+.mini ul { list-style: none; margin: 0; padding: 0; }
+.mini li { display: flex; align-items: center; gap: 2px; min-width: 0; padding: 1px 0; }
+.mini .rl { width: 12px; height: 12px; border-radius: 3px; display: grid; place-items: center; color: #fff; font-size: 8px; font-weight: 900; flex: none; }
+.mini .mn { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-weight: 600; }
+.mini .ms { flex: none; font-weight: 700; color: var(--muted); }
+.mini .mtag { display: block; margin-top: 3px; padding: 1px 2px; border-radius: 5px; font-size: 8.5px; line-height: 1.15; font-weight: 800; color: #fff; text-align: center; overflow-wrap: anywhere; }
+.mini.k-loss .mtag { background: var(--out-loss); }
+.mini.k-draw .mtag { background: var(--out-draw); }
+/* X semitransparente por cima do card */
+.mini .mx { position: absolute; inset: 0; pointer-events: none; }
+.mini .mx::before, .mini .mx::after { content: ''; position: absolute; left: 50%; top: 50%; width: 150%; height: 5px; border-radius: 3px; opacity: .28; }
+.mini .mx::before { transform: translate(-50%, -50%) rotate(55deg); }
+.mini .mx::after { transform: translate(-50%, -50%) rotate(-55deg); }
+.mini.k-loss .mx::before, .mini.k-loss .mx::after { background: var(--out-loss); }
+.mini.k-draw .mx::before, .mini.k-draw .mx::after { background: var(--out-draw); }
+.outs-wrap .link { margin-top: 4px; min-height: 44px; }

@@ -196,6 +196,13 @@ Do 2º jogo em diante **não existe par ou ímpar**. Essas regras são automáti
   "aguardando goleiro"; 🧤 Goleiros troca goleiros de time (▲ ▼ ⤓).
 
 
+### Times que saíram (topo da tela da partida)
+Acima dos botões de resultado fica a galeria de miniaturas (4 por linha no celular) de cada time que saiu de campo,
+na ordem dos jogos: time, colete, estrelas, goleiro e linha (G/D/M/A, nome e estrelas) **como jogou naquele jogo**,
+com a etiqueta "Perdeu p/ Time X" (borda e X vermelhos) ou "Empatou c/ Time Y" (borda e X turquesa). Com mais de 8,
+aparecem as 8 últimas e o botão "Ver todos". A explicação detalhada de cada jogo continua no 📋 Registro e em
+"Último jogo", no fim da tela.
+
 ### Outras decisões
 - Atrasado de linha entra na base da última equipe da fila se houver vaga; senão abre nova equipe.
   Goleiro atrasado vai para o próximo time da sequência sem goleiro (se todos tiverem, aguarda time).

@@ -386,8 +386,17 @@ Tudo é automático; não há opção em Ajustes (revisado em 2026-11-20 a pedid
 - **RN-64** Antes de confirmar, o app mostra a explicação do que vai acontecer e, no empate, a checagem:
   é o primeiro jogo? quantos completos aguardam (PRO/RE)? quem defende permanência? O vencedor do par ou
   ímpar só é pedido no empate do 1º jogo (RN-56).
-- **RN-65** Depois de confirmar, mostra "Último resultado" com a explicação e todas as movimentações
-  (divisões, novas equipes). A tela também indica, antes do jogo, o que acontece se empatar.
+- **RN-65** *(revisada em 2026-11-21)* A explicação e todas as movimentações de cada jogo (divisões, novas equipes,
+  goleiros, coletes) ficam no **Registro** e em "Último jogo" no fim da tela; a caixa "Último resultado" acima dos
+  botões saiu e deu lugar à galeria da RN-141. A tela também indica, antes do jogo, o que acontece se empatar.
+- **RN-141 — Galeria dos times que saíram** *(2026-11-21)*. Acima dos botões de resultado, miniaturas (4 por linha no
+  celular) de todos os times que **saíram de campo** por derrota ou empate, em ordem cronológica. Cada uma mostra o
+  time, o colete e o total de estrelas daquele jogo, o goleiro e a linha (função G/D/M/A, nome e estrelas) e uma
+  etiqueta "Perdeu p/ Time X" ou "Empatou c/ Time Y". Derrota: **borda e X vermelhos** semitransparentes; empate:
+  **borda e X turquesa**. No empate em que um time fica (par ou ímpar, desafiante), só quem saiu aparece. A
+  miniatura usa o retrato salvo no apito (`game.teamA/teamB`), então não muda quando os jogadores se misturam na
+  fila; desfazer o resultado remove a miniatura. Com mais de 8, mostra as 8 mais recentes e o botão "Ver todos"
+  (decisão de implementação, para os botões de resultado não descerem demais). Cálculo em `outGallery` (domínio).
 - **RN-66** Ajuste manual de permanência existe apenas para correção de registro ("Mais opções").
 
 ### 9.6 Tabela-resumo
@@ -729,7 +738,7 @@ Proteções da auditoria de ponto cego (pedido do dono em 2026-11-20):
 
 ---
 
-## 18. Testes automatizados (cobertura atual: 177 testes)
+## 18. Testes automatizados (cobertura atual: 181 testes)
 
 Executar em `tests/index.html` (navegador) ou `node tests/run-node.mjs`.
 

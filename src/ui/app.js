@@ -137,7 +137,7 @@ async function pinOk() {
  * Visitante não altera nada: qualquer outra ação pede o PIN mestre antes de rodar.
  */
 const FREE_ACTIONS = new Set([
-  'go', 'go-history', 'modal-close', 'modal-close-bg', 'pfilter', 'toggle-invert', 'toggle-queue', 'dismiss-exp', 'htab',
+  'go', 'go-history', 'modal-close', 'modal-close-bg', 'pfilter', 'toggle-invert', 'toggle-queue', 'toggle-gallery', 'htab',
   'share', 'share-copy', 'share-wa', 'share-native', 'export', 'share-backup', 'open-log', 'open-more',
   'admin-toggle', 'pin-ok', 'player-edit', 'player-admin-edit', 'cloud-sync', 'wipe', 'confirm-ok',
   'm-set', 'm-qty', 'm-pos', 'm-type', 'pick', 'roster-official', 'roster-current', 'roster-preview',
@@ -480,8 +480,8 @@ const actions = {
     app.ui.expandQueue = !app.ui.expandQueue;
     render();
   },
-  'dismiss-exp': () => {
-    app.ui.lastExplanation = null;
+  'toggle-gallery': () => {
+    app.ui.galleryAll = !app.ui.galleryAll;
     render();
   },
 

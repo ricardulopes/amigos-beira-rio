@@ -5,7 +5,7 @@ import {
   isValidStars, sumStars, mean, median, range, formatStars, starsText,
   planParticipation, goalkeeperNote, toleranceInfo, clampLinePerTeam, clampTolerance, clampTransferQty, prepareDraw, defaultTitle,
   drawHint, advantageStatus, registerResult, balanceSummary, teamExitGroups, gamesSummary,
-  playerDraft, togglePosition, RuleError, linePositions, positionOf,
+  playerDraft, togglePosition, RuleError, linePositions, positionOf, outGallery,
 } from '../src/domain/index.js';
 
 suite('Numeração de posições (de baixo para cima)', () => {
@@ -176,5 +176,60 @@ suite('Resumos (stats.js) e cadastro', () => {
     assert.deepEqual(p.positions, ['D'], 'rascunho não altera o original');
     assert.deepEqual(togglePosition(['D', 'M'], 'D'), ['M']);
     assert.deepEqual(togglePosition(['M'], 'A'), ['M', 'A']);
+  });
+});
+
+suite('Galeria dos times que saíram (RN-141)', () => {
+  const R = (s, r, o) => registerResult(s, r, o).state;
+
+  test('Derrota: o perdedor entra com a escalação do apito, colete, estrelas e "Perdeu p/"', () => {
+    let s = mkSession([5, 5, 5], { goalkeepers: 2, stars: (ti, i) => (ti === 1 ? i + 1 : 2) });
+    const t2Line = s.teams.t2.line.map((x) => x.pid);
+    s = R(s, 'A'); // Time 1 vence o Time 2
+    const g = outGallery(s);
+    assert.equal(g.length, 1);
+    const m = g[0];
+    assert.equal(m.kind, 'loss');
+    assert.equal(m.label, 'Time 2');
+    assert.equal(m.outcome, 'Perdeu p/ Time 1');
+    assert.equal(m.vest, 'blue', 'colete que vestia no jogo');
+    assert.equal(m.sum, 15, '1+2+3+4+5 estrelas de linha');
+    assert.deepEqual(m.gks.map((x) => x.name), ['Goleiro 2']);
+    assert.deepEqual(m.line.map((x) => x.name), t2Line.map((pid) => s.snapshot[pid].name));
+    assert.deepEqual(m.line.map((x) => x.position), [5, 4, 3, 2, 1], 'topo primeiro, posição de baixo para cima');
+    assert.ok(m.line.every((x) => ['D', 'M', 'A'].includes(x.role)));
+  });
+
+  test('Empate com saída dupla: os dois sobem como empate; empate em que um fica: só quem saiu', () => {
+    let s = mkSession([5, 5, 5, 5]);
+    s = R(s, 'draw', { tossWinner: 't2' }); // 1º jogo, PRO e RE completos: saem os dois
+    let g = outGallery(s);
+    assert.deepEqual(g.map((x) => [x.label, x.kind, x.outcome]), [['Time 1', 'draw', 'Empatou c/ Time 2'], ['Time 2', 'draw', 'Empatou c/ Time 1']]);
+    let s3 = mkSession([5, 5, 5]);
+    s3 = R(s3, 'A'); // Time 2 perde
+    s3 = R(s3, 'draw'); // Time 3 (desafiante) fica; Time 1 sai
+    g = outGallery(s3);
+    assert.deepEqual(g.map((x) => [x.game, x.label, x.kind]), [[1, 'Time 2', 'loss'], [2, 'Time 1', 'draw']], 'ordem cronológica');
+    assert.equal(g[1].outcome, 'Empatou c/ Time 3');
+  });
+
+  test('A miniatura não muda quando os jogadores se misturam depois (retrato fiel do jogo)', () => {
+    let s = mkSession([5, 5, 5, 2]);
+    s = R(s, 'A'); // Time 2 perde, cede jogadores ao Time 4 e o restante vira Time 5
+    const before = JSON.stringify(outGallery(s)[0]);
+    assert.ok(!s.teams.t2, 'Time 2 foi desfeito na fila');
+    s = R(s, 'B');
+    s = R(s, 'A');
+    assert.equal(JSON.stringify(outGallery(s)[0]), before);
+    assert.equal(outGallery(s)[0].line.length, 5, 'escalação completa do apito');
+    assert.equal(outGallery(s).length, 3);
+  });
+
+  test('Sem jogos: galeria vazia; desfazer o resultado remove a miniatura', () => {
+    const s0 = mkSession([5, 5, 5]);
+    assert.deepEqual(outGallery(s0), []);
+    const s1 = R(s0, 'A');
+    assert.equal(outGallery(s1).length, 1);
+    assert.equal(outGallery(s0).length, 0, 'o estado anterior (desfazer) continua sem miniatura');
   });
 });

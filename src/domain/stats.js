@@ -1,6 +1,6 @@
 // Estatísticas e resumos calculados a partir do estado da pelada (somente leitura).
 import { allTeamsInOrder, isComplete, teamStats, lineStarsRef, usesGkQueue } from './session.js';
-import { range, mean } from './stars.js';
+import { range, mean, sumStars } from './stars.js';
 import { exitGroups, incompleteTarget } from './draw.js';
 
 /** Grupos de saída (1, 2 e 3 primeiros a sair) de uma equipe da pelada (RN-35). */
@@ -71,4 +71,39 @@ export function balanceSummary(s) {
 export function gamesSummary(s) {
   const wins = s.games.filter((g) => g.result !== 'draw').length;
   return { games: s.games.length, wins, draws: s.games.length - wins };
+}
+
+/**
+ * RN-141: galeria dos times que saíram de campo por derrota ou empate, em ordem cronológica.
+ * Usa o retrato salvo no jogo (`game.teamA/teamB`, tirado no apito, antes de qualquer movimentação), então a
+ * miniatura mantém a escalação que jogou mesmo depois que os jogadores se misturam na fila.
+ * Só entra quem SAIU: no empate em que um fica (par ou ímpar, desafiante), só o que saiu aparece.
+ * @returns {{key, game, kind: 'loss'|'draw', id, label, vest, outcome, sum, gks, line}[]}
+ */
+export function outGallery(s) {
+  const out = [];
+  for (const g of s.games || []) {
+    if (!g.teamA || !g.teamB) continue;
+    const winner = g.result === 'A' ? g.teamA : g.result === 'B' ? g.teamB : null;
+    for (const t of [g.teamA, g.teamB]) {
+      const other = t === g.teamA ? g.teamB : g.teamA;
+      const left = Array.isArray(g.leaving) ? g.leaving.includes(t.label) : winner ? t !== winner : true;
+      if (!left || t === winner) continue;
+      const kind = g.result === 'draw' ? 'draw' : 'loss';
+      out.push({
+        key: `${g.n}-${t.id}`,
+        game: g.n,
+        kind,
+        id: t.id,
+        label: t.label,
+        vest: t.vest || null,
+        outcome: kind === 'loss' ? `Perdeu p/ ${other.label}` : `Empatou c/ ${other.label}`,
+        sum: sumStars(t.line),
+        gks: t.gks.map((x) => ({ name: x.name, stars: x.stars })),
+        // topo primeiro (como no card); posição contada de baixo para cima (RN-33a)
+        line: t.line.map((x, i) => ({ name: x.name, stars: x.stars, role: x.role, position: t.line.length - i })),
+      });
+    }
+  }
+  return out;
 }
