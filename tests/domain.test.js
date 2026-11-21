@@ -5,7 +5,7 @@ import {
   isValidStars, sumStars, mean, median, range, formatStars, starsText,
   planParticipation, goalkeeperNote, toleranceInfo, clampLinePerTeam, clampTolerance, clampTransferQty, prepareDraw, defaultTitle,
   drawHint, advantageStatus, registerResult, balanceSummary, teamExitGroups, gamesSummary,
-  playerDraft, togglePosition, RuleError, linePositions, positionOf, outGallery, drawLineup, redraw, startSession, finishSession,
+  playerDraft, togglePosition, RuleError, linePositions, positionOf, outGallery, drawLineup, redraw, startSession, finishSession, historyRanking, rankingSessions,
 } from '../src/domain/index.js';
 
 suite('Numeração de posições (de baixo para cima)', () => {
@@ -305,3 +305,73 @@ suite('Aba Sorteio do histórico (RN-142)', () => {
 function analyzeResultSafe(s, r) {
   return r === 'draw' && s.games.length === 0 ? { tossWinner: s.field[0] } : {};
 }
+
+suite('Ranking acumulado do histórico (RN-143)', () => {
+  const R = (s, r, o) => registerResult(s, r, o).state;
+  const row = (rk, pid) => rk.rows.find((x) => x.pid === pid);
+  /** Pelada encerrada com data: 3 times de 5 e 3 goleiros; Time 1 vence 2, Time 3 vence 1, empate T2 x T3. */
+  const pelada = (iso) => {
+    let s = mkSession([5, 5, 5], { goalkeepers: 3 });
+    s = R(s, 'A'); // T1 (G1) vence T2 (G2)
+    s = R(s, 'B'); // T3 (G3) vence T1
+    s = R(s, 'draw'); // T2 x T3: desafiante T2 fica
+    s = finishSession(s);
+    return { ...s, id: `s-${iso}`, createdAt: iso, startedAt: iso };
+  };
+
+  test('Linha: jogos, V/E/D, pontos 3-1-0, aproveitamento e presença vêm dos jogos salvos', () => {
+    const s = pelada('2026-11-10T20:00:00');
+    const rk = historyRanking([s], { type: 'line' });
+    assert.equal(rk.peladas, 1);
+    assert.equal(rk.games, 3);
+    const a = row(rk, 'T1P1'); // V, D
+    assert.deepEqual([a.presences, a.games, a.wins, a.draws, a.losses, a.points, a.pct], [1, 2, 1, 0, 1, 3, 50]);
+    const c = row(rk, 'T3P1'); // V, E
+    assert.deepEqual([c.games, c.wins, c.draws, c.losses, c.points, c.pct, c.bestStreak], [2, 1, 1, 0, 4, 67, 1]);
+    const b = row(rk, 'T2P1'); // D, E
+    assert.deepEqual([b.games, b.points, b.pct], [2, 1, 17]);
+    assert.equal(rk.rows[0].pid.startsWith('T3'), true, 'mais pontos primeiro');
+    assert.ok(!rk.rows.some((x) => x.pid.startsWith('G')), 'goleiro fora da tabela de linha');
+  });
+
+  test('Goleiros: tabela própria, com jogos sem perder', () => {
+    const rk = historyRanking([pelada('2026-11-10T20:00:00')], { type: 'gk' });
+    assert.deepEqual(rk.rows.map((x) => x.pid).sort(), ['G1', 'G2', 'G3']);
+    const g3 = row(rk, 'G3');
+    assert.deepEqual([g3.games, g3.wins, g3.draws, g3.unbeaten, g3.presences], [2, 1, 1, 2, 1]);
+    assert.equal(row(rk, 'G2').unbeaten, 1);
+  });
+
+  test('Acumula várias peladas, sequência de vitórias e filtros de período', () => {
+    const old = pelada('2026-03-01T20:00:00');
+    const mid = pelada('2026-10-01T20:00:00');
+    const recent = pelada('2026-11-15T20:00:00');
+    const all = [recent, old, mid, { ...mid, id: 'rascunho', status: 'draft' }];
+    const now = '2026-11-21T12:00:00';
+    assert.equal(historyRanking(all, { now }).peladas, 3, 'rascunho não conta');
+    assert.equal(row(historyRanking(all, { now }), 'T1P1').presences, 3);
+    assert.equal(row(historyRanking(all, { now }), 'T1P1').games, 6);
+    assert.equal(historyRanking(all, { period: 'semester', now }).peladas, 2, 'mar/2026 é do 1º semestre');
+    assert.equal(historyRanking(all, { period: 'month', now }).peladas, 1);
+    assert.deepEqual(rankingSessions(all, 'all', now).map((s) => s.createdAt.slice(0, 7)), ['2026-03', '2026-10', '2026-11']);
+    // T3P1: V, E em cada pelada → a maior sequência de vitórias seguidas é 1
+    assert.equal(row(historyRanking(all, { now }), 'T3P1').bestStreak, 1);
+  });
+
+  test('Ordenações: aproveitamento exige mínimo de jogos; presença; não altera o histórico', () => {
+    const s = pelada('2026-11-10T20:00:00');
+    const late = { id: 'LATE', name: 'Atrasado', stars: 2, type: 'line', positions: ['M'] };
+    const s2 = { ...s, snapshot: { ...s.snapshot, LATE: late }, games: [...s.games, { n: 4, result: 'A', teamA: { line: [{ pid: 'LATE', name: 'Atrasado', stars: 2 }], gks: [] }, teamB: { line: [], gks: [] } }] };
+    const before = JSON.stringify(s2);
+    const other = pelada('2026-11-12T20:00:00'); // os demais passam a ter 3 ou mais jogos
+    const pct = historyRanking([s2, other], { sort: 'pct' });
+    assert.equal(row(pct, 'LATE').pct, 100);
+    assert.ok(pct.rows[0].pid !== 'LATE', 'com 1 jogo não lidera o aproveitamento');
+    assert.equal(pct.rows[pct.rows.length - 1].pid, 'LATE');
+    const pres = historyRanking([s2, other], { sort: 'presence' });
+    assert.equal(pres.rows[0].presences, 2);
+    assert.equal(pres.rows[pres.rows.length - 1].pid, 'LATE', 'quem veio a menos peladas fica embaixo');
+    assert.equal(JSON.stringify(s2), before, 'leitura pura');
+    assert.deepEqual(historyRanking([]).rows, []);
+  });
+});

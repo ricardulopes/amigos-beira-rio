@@ -505,3 +505,16 @@ button.tile { text-align: left; font: inherit; width: 100%; cursor: pointer; }
 .mini.k-loss .mx::before, .mini.k-loss .mx::after { background: var(--out-loss); }
 .mini.k-draw .mx::before, .mini.k-draw .mx::after { background: var(--out-draw); }
 .outs-wrap .link { margin-top: 4px; min-height: 44px; }
+
+/* RN-143: ranking acumulado do histórico (cabe em 360 px) */
+.rk-wrap { overflow-x: auto; margin: 0 -4px; }
+.rk-table { width: 100%; border-collapse: collapse; font-size: 12.5px; background: var(--surface); border-radius: 10px; }
+.rk-table th, .rk-table td { padding: 7px 3px; text-align: center; border-bottom: 1px solid var(--line); white-space: nowrap; }
+.rk-table th { font-size: 11px; color: var(--muted); text-transform: uppercase; }
+.rk-table .pos { color: var(--muted); font-weight: 700; width: 26px; }
+.rk-table .who { text-align: left; white-space: normal; max-width: 120px; }
+.rk-table .rn { display: block; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rk-table .rs { font-size: 10.5px; color: var(--muted); font-weight: 700; }
+.rk-table .ved { letter-spacing: -.02em; }
+.rk-table tr.few td { opacity: .55; }
+.rk-table tbody tr:nth-child(-n+3) .pos { color: var(--brand-fg); }

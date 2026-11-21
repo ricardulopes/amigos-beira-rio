@@ -533,6 +533,14 @@ completam o 5º time; os dois seguintes abrem o 6º; o quinto atrasado entra no 
   congelado com nome e estrelas de cada vaga (linha e goleiros). Peladas antigas são recuperadas na leitura: nome
   e estrelas vêm do retrato, senão do snapshot da pelada, senão das escalações salvas nos jogos; sem fonte, a
   vaga aparece como "(sem registro)". Cálculo em `drawLineup` (domínio).
+- **RN-143 — Ranking acumulado** *(2026-11-21)*. Histórico → aba **🏅 Ranking** (ao lado de "Peladas"), só leitura, calculado
+  das peladas salvas (ao vivo ou encerradas; rascunho não conta). Tabelas separadas de **Linha** e **Goleiros**, pelo
+  papel em cada jogo (linha × gol); presença pelo tipo do atleta naquela pelada. Colunas: presenças, jogos,
+  V-E-D, pontos (**vitória 3, empate 1, derrota 0**, decisão do dono), aproveitamento = pontos ÷ (3 × jogos) e, na
+  linha, a maior sequência de vitórias; nos goleiros, jogos sem perder. Estrelas aparecem só como referência
+  (cadastro da pelada mais recente). O app não registra gols, então não há artilharia nem gols sofridos (decisão do
+  dono). Filtros: Geral, Este semestre, Últimos 30 dias; ordenar por Pontos, Aproveitamento ou Presença. No
+  aproveitamento, quem tem menos de 3 jogos fica abaixo dos demais (aparece esmaecido). Cálculo em `historyRanking`.
 
 ---
 
@@ -745,7 +753,7 @@ Proteções da auditoria de ponto cego (pedido do dono em 2026-11-20):
 
 ---
 
-## 18. Testes automatizados (cobertura atual: 185 testes)
+## 18. Testes automatizados (cobertura atual: 189 testes)
 
 Executar em `tests/index.html` (navegador) ou `node tests/run-node.mjs`.
 

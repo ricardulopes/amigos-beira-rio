@@ -5,7 +5,7 @@ import { cloud, adminUntil } from '../cloud/sync.js';
 import {
   filterPlayers, ROLE_NAMES, REMOVAL_REASONS, STAR_VALUES, LIMITS, planParticipation, toleranceInfo, defaultTitle as domainDefaultTitle,
   ADMIN_ACTIONS, PUBLIC_ACTIONS, allTeamsInOrder, queueLabel, teamStats, isComplete, linePositions, playerStats, balanceSummary, gamesSummary, teamExitGroups, drawHint, advantageStatus,
-  vestOf, vestName, incomingVest, outGallery, drawLineup,
+  vestOf, vestName, incomingVest, outGallery, drawLineup, historyRanking, RANKING_PERIODS, RANKING_SORTS, RANKING_MIN_GAMES,
   financeSettings, cyclesAvailable, cycleRanking, cycleList, NEXT_CYCLE, statement, paymentSummary, formatMoney, PAYMENT_METHODS, FINANCE_RULES,
   CALL_PAYMENT_METHODS, callPaymentOf, cashReport,
   groupCashback, closedCycleOf, reopenInfo, financeAthletes, usesGkQueue, goalkeeperPreview,
@@ -421,16 +421,44 @@ export function gameLine(g) {
 
 export function historyView() {
   const list = app.db.sessions.filter((s) => s.status !== 'draft').slice().sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  const view = app.ui.histView || 'list';
+  const t = (k, l) => `<button class="chip ${view === k ? 'on' : ''}" data-act="hist-view" data-v="${k}">${l}</button>`;
   return `${header('Histórico')}
   <main class="page">
-    ${list.length ? '' : '<div class="card empty">Nenhuma pelada registrada ainda.</div>'}
+    <div class="chips">${t('list', '📅 Peladas')}${t('ranking', '🏅 Ranking')}</div>
+    ${view === 'ranking' ? rankingSection() : `${list.length ? '' : '<div class="card empty">Nenhuma pelada registrada ainda.</div>'}
     <ul class="list">
       ${list.map((s) => `<li class="row" data-act="go" data-to="/historico/${s.id}">
         <div class="grow"><div class="name">${esc(s.title)} ${s.status === 'live' ? '<span class="pill live">ao vivo</span>' : ''}</div>
         <div class="muted small">${new Date(s.createdAt).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })} · ${s.games.length} jogos · ${Object.keys(s.snapshot).length} participantes</div></div>
         <span class="chev">›</span></li>`).join('')}
-    </ul>
+    </ul>`}
   </main>`;
+}
+
+/** RN-143: ranking acumulado (linha e goleiros), com período e ordenação. Só leitura. */
+function rankingSection() {
+  const ui = { type: app.ui.rkType || 'line', period: app.ui.rkPeriod || 'all', sort: app.ui.rkSort || 'points' };
+  const rk = historyRanking(app.db.sessions, ui);
+  const chip = (act, key, cur, label) => `<button class="chip ${cur === key ? 'on' : ''}" data-act="${act}" data-v="${key}">${label}</button>`;
+  const gk = ui.type === 'gk';
+  const rows = rk.rows.map((x, i) => `<tr class="${ui.sort === 'pct' && x.games < RANKING_MIN_GAMES ? 'few' : ''}">
+      <td class="pos">${i + 1}º</td>
+      <td class="who"><span class="rn">${esc(x.name)}</span>${x.stars != null ? `<span class="rs">${fmt(x.stars)}★</span>` : ''}</td>
+      <td>${x.presences}</td><td>${x.games}</td>
+      <td class="ved">${x.wins}-${x.draws}-${x.losses}</td>
+      <td><b>${x.points}</b></td><td>${x.pct}%</td>
+      <td>${gk ? x.unbeaten : x.bestStreak}</td>
+    </tr>`).join('');
+  return `<div class="seg"><button class="${gk ? '' : 'on'}" data-act="rk-type" data-v="line">Linha</button><button class="${gk ? 'on' : ''}" data-act="rk-type" data-v="gk">🧤 Goleiros</button></div>
+    <div class="chips scroll-x">${Object.entries(RANKING_PERIODS).map(([k, l]) => chip('rk-period', k, ui.period, l)).join('')}</div>
+    <div class="chips scroll-x"><span class="muted small">Ordenar:</span>${Object.entries(RANKING_SORTS).map(([k, l]) => chip('rk-sort', k, ui.sort, l)).join('')}</div>
+    <p class="muted small">${rk.peladas} pelada(s) · ${rk.games} jogo(s) no período.</p>
+    ${rk.rows.length ? `<div class="rk-wrap"><table class="rk-table">
+      <thead><tr><th>#</th><th class="who">Atleta</th><th title="Presenças">Pr</th><th title="Jogos">J</th><th title="Vitórias-Empates-Derrotas">V-E-D</th><th title="Pontos">Pts</th><th title="Aproveitamento">%</th><th title="${gk ? 'Jogos sem perder' : 'Maior sequência de vitórias'}">${gk ? 'SP' : 'Seq'}</th></tr></thead>
+      <tbody>${rows}</tbody></table></div>` : '<div class="card empty">Nenhum jogo registrado neste período.</div>'}
+    <p class="muted small">Pr = presenças · J = jogos · Pts: vitória 3, empate 1, derrota 0 · % = pontos ÷ (3 × jogos) · ${gk ? 'SP = jogos sem perder' : 'Seq = maior sequência de vitórias'}.
+      ${ui.sort === 'pct' ? `No aproveitamento, quem tem menos de ${RANKING_MIN_GAMES} jogos fica abaixo dos demais.` : ''} Estrelas: referência do cadastro na pelada mais recente. O app não registra gols.</p>`;
 }
 
 export function historyDetailView(id) {

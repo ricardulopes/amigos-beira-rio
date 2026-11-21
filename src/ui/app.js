@@ -137,7 +137,7 @@ async function pinOk() {
  * Visitante não altera nada: qualquer outra ação pede o PIN mestre antes de rodar.
  */
 const FREE_ACTIONS = new Set([
-  'go', 'go-history', 'modal-close', 'modal-close-bg', 'pfilter', 'toggle-invert', 'toggle-queue', 'toggle-gallery', 'htab',
+  'go', 'go-history', 'modal-close', 'modal-close-bg', 'pfilter', 'toggle-invert', 'toggle-queue', 'toggle-gallery', 'htab', 'hist-view', 'rk-type', 'rk-period', 'rk-sort',
   'share', 'share-copy', 'share-wa', 'share-native', 'export', 'share-backup', 'open-log', 'open-more',
   'admin-toggle', 'pin-ok', 'player-edit', 'player-admin-edit', 'cloud-sync', 'wipe', 'confirm-ok',
   'm-set', 'm-qty', 'm-pos', 'm-type', 'pick', 'roster-official', 'roster-current', 'roster-preview',
@@ -478,6 +478,23 @@ const actions = {
   },
   'toggle-queue': () => {
     app.ui.expandQueue = !app.ui.expandQueue;
+    render();
+  },
+  // RN-143: ranking acumulado do histórico (só leitura)
+  'hist-view': (d) => {
+    app.ui.histView = d.v;
+    render();
+  },
+  'rk-type': (d) => {
+    app.ui.rkType = d.v;
+    render();
+  },
+  'rk-period': (d) => {
+    app.ui.rkPeriod = d.v;
+    render();
+  },
+  'rk-sort': (d) => {
+    app.ui.rkSort = d.v;
     render();
   },
   'toggle-gallery': () => {

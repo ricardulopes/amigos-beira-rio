@@ -142,3 +142,78 @@ export function drawLineup(s) {
   });
   return { total: draws.length, at: d.at, teams, missing };
 }
+
+// ---------------------------------------------------------------- ranking acumulado (RN-143)
+
+export const RANKING_PERIODS = { all: 'Geral', semester: 'Este semestre', month: 'Últimos 30 dias' };
+export const RANKING_SORTS = { points: 'Pontos', pct: 'Aproveitamento', presence: 'Presença' };
+/** Mínimo de jogos para disputar o topo do ranking por aproveitamento (evita 100% com 1 jogo). */
+export const RANKING_MIN_GAMES = 3;
+
+const peladaDate = (s) => s.startedAt || s.createdAt || '';
+
+/** Peladas do período (iniciadas: ao vivo ou encerradas), da mais antiga para a mais recente. */
+export function rankingSessions(sessions = [], period = 'all', now = new Date().toISOString()) {
+  const t = new Date(now);
+  const inPeriod = (iso) => {
+    if (period === 'month') return t - new Date(iso) <= 30 * 86400000;
+    if (period === 'semester') {
+      const d = new Date(iso);
+      return d.getFullYear() === t.getFullYear() && (d.getMonth() < 6) === (t.getMonth() < 6);
+    }
+    return true;
+  };
+  return sessions
+    .filter((s) => s && (s.status === 'live' || s.status === 'finished') && s.snapshot && inPeriod(peladaDate(s)))
+    .sort((a, b) => peladaDate(a).localeCompare(peladaDate(b)));
+}
+
+/**
+ * RN-143: ranking acumulado a partir do histórico salvo (só leitura; nada é alterado).
+ * Linha e goleiros em tabelas separadas, pelo papel no jogo (`game.teamX.line` × `game.teamX.gks`); presença pelo tipo
+ * do atleta no snapshot de cada pelada. Pontos 3-1-0; aproveitamento = pontos ÷ (3 × jogos), arredondado.
+ * @param {{type?: 'line'|'gk', period?: string, sort?: string, now?: string}} opts
+ */
+export function historyRanking(sessions = [], { type = 'line', period = 'all', sort = 'points', now } = {}) {
+  const list = rankingSessions(sessions, period, now);
+  const st = new Map();
+  const get = (pid, p) => {
+    if (!st.has(pid)) st.set(pid, { pid, name: p?.name || pid, stars: p?.stars ?? null, presences: 0, games: 0, wins: 0, draws: 0, losses: 0, streak: 0, bestStreak: 0 });
+    const x = st.get(pid);
+    if (p?.name) x.name = p.name; // nome e estrelas da pelada mais recente (referência)
+    if (p?.stars != null) x.stars = p.stars;
+    return x;
+  };
+  for (const s of list) {
+    for (const p of Object.values(s.snapshot)) if ((p.type === 'gk' ? 'gk' : 'line') === type) get(p.id, p).presences++;
+    for (const g of s.games || []) {
+      const sides = [[g.teamA, g.result === 'A' ? 'w' : g.result === 'B' ? 'l' : 'd'], [g.teamB, g.result === 'B' ? 'w' : g.result === 'A' ? 'l' : 'd']];
+      for (const [t, r] of sides) {
+        for (const p of (type === 'gk' ? t?.gks : t?.line) || []) {
+          const x = get(p.pid, { name: p.name, stars: p.stars });
+          x.games++;
+          if (r === 'w') {
+            x.wins++;
+            x.streak++;
+            x.bestStreak = Math.max(x.bestStreak, x.streak);
+          } else {
+            x.streak = 0;
+            if (r === 'l') x.losses++;
+            else x.draws++;
+          }
+        }
+      }
+    }
+  }
+  const rows = [...st.values()].map(({ streak, ...x }) => {
+    const points = 3 * x.wins + x.draws;
+    return { ...x, points, unbeaten: x.wins + x.draws, pct: x.games ? Math.round((100 * points) / (3 * x.games)) : 0 };
+  });
+  const byName = (a, b) => a.name.localeCompare(b.name, 'pt-BR');
+  const cmp = {
+    points: (a, b) => b.points - a.points || b.pct - a.pct || b.games - a.games || byName(a, b),
+    pct: (a, b) => (b.games >= RANKING_MIN_GAMES) - (a.games >= RANKING_MIN_GAMES) || b.pct - a.pct || b.points - a.points || byName(a, b),
+    presence: (a, b) => b.presences - a.presences || b.games - a.games || b.points - a.points || byName(a, b),
+  }[sort] || ((a, b) => b.points - a.points || byName(a, b));
+  return { peladas: list.length, games: list.reduce((n, s) => n + (s.games?.length || 0), 0), rows: rows.sort(cmp) };
+}

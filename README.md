@@ -206,6 +206,9 @@ aparecem as 8 últimas e o botão "Ver todos". A explicação detalhada de cada 
 ### Outras decisões
 - Histórico → aba **Sorteio**: mostra o sorteio que valeu (o último antes do 1º jogo), com nome, estrelas e goleiro de
   cada vaga guardados no momento do sorteio. Peladas antigas são recuperadas pelas escalações dos jogos.
+- Histórico → **🏅 Ranking**: acumulado de todas as peladas (ou deste semestre / últimos 30 dias), com tabelas de **linha**
+  e de **goleiros**: presenças, jogos, V-E-D, pontos (3-1-0), aproveitamento e maior sequência de vitórias (goleiros:
+  jogos sem perder). Ordena por pontos, aproveitamento (mínimo de 3 jogos para o topo) ou presença. Sem gols: o app não os registra.
 - Atrasado de linha entra na base da última equipe da fila se houver vaga; senão abre nova equipe.
   Goleiro atrasado vai para o próximo time da sequência sem goleiro (se todos tiverem, aguarda time).
 - Saída por lesão, cansaço ou desistência: a vaga é reposta **automaticamente**, na mesma esteira de

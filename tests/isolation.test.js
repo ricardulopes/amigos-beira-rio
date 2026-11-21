@@ -39,7 +39,7 @@ async function domainModules() {
 // Ações que só leem, navegam ou mexem em janelas já liberadas pelo PIN. Botão novo que ALTERA dados
 // nunca entra aqui: fica fora de FREE_ACTIONS e o app pede o PIN mestre (RN-114, RN-116).
 const READ_ONLY_ACTIONS = new Set([
-  'go', 'go-history', 'modal-close', 'modal-close-bg', 'pfilter', 'toggle-invert', 'toggle-queue', 'toggle-gallery', 'htab',
+  'go', 'go-history', 'modal-close', 'modal-close-bg', 'pfilter', 'toggle-invert', 'toggle-queue', 'toggle-gallery', 'htab', 'hist-view', 'rk-type', 'rk-period', 'rk-sort',
   'share', 'share-copy', 'share-wa', 'share-native', 'export', 'share-backup', 'open-log', 'open-more',
   'admin-toggle', 'pin-ok', 'player-edit', 'player-admin-edit', 'cloud-sync', 'wipe', 'confirm-ok',
   'm-set', 'm-qty', 'm-pos', 'm-type', 'pick', 'roster-official', 'roster-current', 'roster-preview',

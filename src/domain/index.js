@@ -42,7 +42,10 @@ export { addLatePlayer } from './arrivals.js';
 export { removePlayer } from './removals.js';
 export { simulateTransfer, transferPlayers, movePlayerInOrder, swapPlayers, moveGoalkeeper, moveGoalkeeperInLineup, setPermanence } from './adjustments.js';
 export { balanceWarnings, BALANCE_THRESHOLDS } from './balance.js';
-export { playerStats, balanceSummary, gamesSummary, teamExitGroups, outGallery, drawLineup } from './stats.js';
+export {
+  playerStats, balanceSummary, gamesSummary, teamExitGroups, outGallery, drawLineup,
+  RANKING_PERIODS, RANKING_SORTS, RANKING_MIN_GAMES, rankingSessions, historyRanking,
+} from './stats.js';
 export { shareText } from './share.js';
 export {
   PIN_RULES, PUBLIC_ACTIONS, ADMIN_ACTIONS, requiresAdmin, validatePinFormat, adminExpiry, isAdminActive,
