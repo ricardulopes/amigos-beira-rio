@@ -527,6 +527,8 @@ completam o 5º time; os dois seguintes abrem o 6º; o quinto atrasado entra no 
   **Horário de encerramento vazio** (nada pré-selecionado) e o atalho opcional **"Usar horário atual"**. Sem horário,
   não encerra. O horário vira data a partir do início (antes do início = passou da meia-noite); horário no futuro
   ou pelada com mais de 12 h são recusados com aviso. O registro guarda "Pelada encerrada às HH:MM".
+  *(Auditoria 2026-11-21)* Encerrar nos 3 min antes do início oficial (começou e desistiu) grava o próprio início, sem
+  travar; hora antes do início que não pode ser madrugada recebe "está no futuro ou antes do início da pelada (HH:MM)".
 
 ---
 
@@ -639,7 +641,9 @@ login ou senha, e toda alteração passa a exigir o PIN mestre (RN-116 reescrita
   topo mostra "sem internet" e quantas alterações aguardam. Cada pelada tem número de versão: se dois
   admins alteraram a mesma pelada sem sinal, **vale a de quem enviou primeiro**; o outro é avisado e a
   versão dele fica guardada no aparelho (`pelada.conflito.<id>`). Jogadores e ajustes: vale a última
-  gravação.
+  gravação. *(Auditoria 2026-11-21)* Se o sinal cair **depois** de a nuvem gravar e antes da resposta chegar, o
+  próximo envio daria um falso conflito: agora o aparelho guarda a impressão digital (JSON canônico) dos envios sem
+  resposta e, se a nuvem tiver exatamente um deles, adota a versão e reenvia o que mudou depois, sem descartar nada.
 - **RN-116 — Visitante só lê.** (Reescrita em 2026-11-19; substitui o "código do jogador".) Quem
   abre o app sem PIN é **visitante**: vê em tempo real todas as abas, listas, times, sorteios, placares
   e histórico, **sem digitar nada, sem login e sem senha**, e não altera nada — nem a própria posição.
@@ -781,7 +785,7 @@ Proteções da auditoria de ponto cego (pedido do dono em 2026-11-20):
 
 ---
 
-## 18. Testes automatizados (cobertura atual: 200 testes)
+## 18. Testes automatizados (cobertura atual: 204 testes)
 
 Executar em `tests/index.html` (navegador) ou `node tests/run-node.mjs`.
 

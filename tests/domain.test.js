@@ -473,3 +473,19 @@ suite('Horários: início no sorteio + 3 min e encerramento confirmado (RN-145, 
     assert.equal(clockOf(local(2026, 11, 21, 7, 5)), '07:05', 'atalho "Usar horário atual" preenche HH:MM');
   });
 });
+
+suite('Horários: casos de borda do encerramento (auditoria 2026-11-21)', () => {
+  const local = (h, mi, d = 21) => new Date(2026, 10, d, h, mi).toISOString();
+  const s = { ...mkSession([5, 5]), startedAt: local(20, 3) }; // início oficial 20:03 (sorteio às 20:00)
+
+  test('Começou e desistiu antes do início oficial: encerra no próprio início, sem travar 3 minutos', () => {
+    assert.equal(resolveFinishTime(s, '20:01', local(20, 1)), local(20, 3));
+    assert.equal(resolveFinishTime(s, '20:02', local(20, 2)), local(20, 3));
+  });
+
+  test('Hora digitada antes do início (engano): a mensagem cita o início da pelada', () => {
+    assert.throws(() => resolveFinishTime(s, '19:00', local(22, 0)), /19:00 está no futuro ou antes do início da pelada \(20:03\)/);
+    assert.throws(() => resolveFinishTime(s, '23:00', local(22, 0)), /futuro/, 'depois do início e ainda não chegou');
+    assert.equal(resolveFinishTime(s, '00:10', local(0, 20, 22)), local(0, 10, 22), 'meia-noite continua valendo');
+  });
+});

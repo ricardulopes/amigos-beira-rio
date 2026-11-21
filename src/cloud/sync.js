@@ -3,7 +3,10 @@
 // vai para uma fila (outbox) e é enviada assim que houver internet; mudanças de outros aparelhos chegam
 // em tempo real (Realtime). Regras de jogo continuam no domínio; aqui só se move dados.
 import { SUPABASE_URL, SUPABASE_KEY } from './config.js';
-import { emptyOutbox, outboxSize, diffDb, isEmptyDiff, addToOutbox, mergeRemote, mergeAppState, rowToPlayer, playerToRow, appStateOf } from './diff.js';
+import {
+  emptyOutbox, outboxSize, diffDb, isEmptyDiff, addToOutbox, mergeRemote, mergeAppState, rowToPlayer, playerToRow, appStateOf,
+  stateFingerprint, isOwnLostWrite, stableStringify,
+} from './diff.js';
 
 const K = { outbox: 'pelada.outbox', versions: 'pelada.versions', token: 'pelada.admin.token' };
 const RETRY_MS = 20000;
@@ -190,14 +193,19 @@ export async function flush() {
         continue;
       }
       const sentJson = JSON.stringify(s);
+      // Guarda a impressão digital do que vai subir: se o sinal cair depois de a nuvem gravar, o próximo
+      // envio reconhece o "conflito" como o nosso próprio envio (sem resposta) e não descarta nada.
+      ob.sent = { ...(ob.sent || {}), [id]: [...(ob.sent?.[id] || []), stateFingerprint(s)].slice(-8) };
+      persistQueue();
       const res = await rpc('admin_save_pelada', { p_token: t.token, p_pelada: s, p_base_version: ob.peladas[id] });
       if (res?.ok) {
         versions[id] = res.version;
+        delete ob.sent[id];
         const cur = hooks.getDb().sessions.find((x) => x.id === id);
         if (cur && JSON.stringify(cur) !== sentJson) ob.peladas[id] = res.version; // mudou durante o envio
         else delete ob.peladas[id];
       } else if (res?.conflict) {
-        await resolveConflict(id, s, res.message);
+        if (!(await adoptOwnLostWrite(id))) await resolveConflict(id, s, res.message);
       }
       persistQueue();
     }
@@ -257,7 +265,19 @@ function scheduleRetry() {
  * Outro admin gravou a pelada antes (RN-115): vale a versão da nuvem. A versão deste aparelho é
  * guardada em `pelada.conflito.<id>` (dá para exportar no backup) e o usuário é avisado.
  */
+async function adoptOwnLostWrite(id) {
+  const { data } = await client.from('peladas').select('id,version,state').eq('id', id).maybeSingle();
+  if (!data || !isOwnLostWrite(ob.sent?.[id], data.state)) return false;
+  versions[id] = data.version;
+  delete ob.sent[id];
+  const cur = hooks.getDb().sessions.find((x) => x.id === id);
+  if (cur && stableStringify(cur) !== stableStringify(data.state)) ob.peladas[id] = data.version; // reenvia o que mudou depois
+  else delete ob.peladas[id];
+  return true;
+}
+
 async function resolveConflict(id, localState, message) {
+  if (ob.sent) delete ob.sent[id];
   write(`pelada.conflito.${id}`, { at: new Date().toISOString(), state: localState });
   delete ob.peladas[id];
   const { data } = await client.from('peladas').select('id,version,state').eq('id', id).maybeSingle();

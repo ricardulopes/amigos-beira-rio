@@ -399,10 +399,20 @@ export function resolveFinishTime(s, clock, now = nowIso()) {
   const min = Number(m[2]);
   if (h > 23 || min > 59) throw new RuleError('Horário inválido.');
   const start = new Date(s.startedAt || s.kickoffAt || s.createdAt);
+  const startClock = clockOf(start.toISOString());
+  const limit = Date.parse(now) + 60000;
   const end = new Date(start);
   end.setHours(h, min, 0, 0);
-  if (end < start) end.setDate(end.getDate() + 1);
-  if (end.getTime() > Date.parse(now) + 60000) throw new RuleError('O horário de encerramento não pode estar no futuro.');
+  if (end < start) {
+    if (start - end <= KICKOFF_DELAY_MIN * 60000 && end.getTime() <= limit) {
+      // encerrada nos 3 minutos antes do início oficial (começou e desistiu): conta como no início
+      return start.toISOString();
+    } else {
+      end.setDate(end.getDate() + 1); // passou da meia-noite
+      if (end.getTime() > limit) throw new RuleError(`${clock} está no futuro ou antes do início da pelada (${startClock}). Confira o horário.`);
+    }
+  }
+  if (end.getTime() > limit) throw new RuleError('O horário de encerramento não pode estar no futuro.');
   if (end - start > MAX_PELADA_HOURS * 3600000) throw new RuleError(`A pelada teria mais de ${MAX_PELADA_HOURS} horas. Confira o horário.`);
   return end.toISOString();
 }

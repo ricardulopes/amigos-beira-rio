@@ -173,3 +173,32 @@ function dedupeById(list) {
   const seen = new Set();
   return list.filter((x) => (seen.has(x.id) ? false : seen.add(x.id)));
 }
+
+// ------------------------------------------------------------------ envio confirmado sem resposta (sinal caiu)
+
+/** JSON com chaves em ordem alfabética: o jsonb do Postgres não preserva a ordem, então comparamos assim. */
+export function stableStringify(x) {
+  if (Array.isArray(x)) return `[${x.map(stableStringify).join(',')}]`;
+  if (x && typeof x === 'object') {
+    return `{${Object.keys(x).sort().filter((k) => x[k] !== undefined).map((k) => `${JSON.stringify(k)}:${stableStringify(x[k])}`).join(',')}}`;
+  }
+  return JSON.stringify(x ?? null);
+}
+
+/** Impressão digital curta de um estado (djb2 sobre o JSON canônico), para guardar na fila sem ocupar espaço. */
+export function stateFingerprint(state) {
+  const s = stableStringify(state);
+  let h = 5381;
+  for (let i = 0; i < s.length; i++) h = ((h << 5) + h + s.charCodeAt(i)) | 0;
+  return `${s.length}:${(h >>> 0).toString(36)}`;
+}
+
+/**
+ * "Conflito" que na verdade é o NOSSO envio anterior: a nuvem gravou, mas a resposta se perdeu (sinal caiu) e o
+ * aparelho ficou com a versão antiga. Se o que está na nuvem é exatamente um dos envios deste aparelho ainda sem resposta,
+ * não há outro administrador: basta adotar a versão da nuvem como base e reenviar o estado atual.
+ */
+export function isOwnLostWrite(sentFingerprints, cloudState) {
+  const list = Array.isArray(sentFingerprints) ? sentFingerprints : [sentFingerprints];
+  return !!cloudState && list.filter(Boolean).includes(stateFingerprint(cloudState));
+}

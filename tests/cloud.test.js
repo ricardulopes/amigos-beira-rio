@@ -1,6 +1,9 @@
 // Banco unificado (RN-113 a RN-117): o que muda, fila offline e mescla com a nuvem — sem rede.
 import { suite, test, assert } from './harness.js';
-import { emptyOutbox, outboxSize, diffDb, isEmptyDiff, addToOutbox, mergeRemote, mergeAppState, merge3, rowToPlayer, playerToRow } from '../src/cloud/diff.js';
+import {
+  emptyOutbox, outboxSize, diffDb, isEmptyDiff, addToOutbox, mergeRemote, mergeAppState, merge3, rowToPlayer, playerToRow,
+  stableStringify, stateFingerprint, isOwnLostWrite,
+} from '../src/cloud/diff.js';
 
 const pl = (id, name, stars = 2, positions = ['M']) => ({ id, name, stars, type: 'line', positions });
 const ses = (id, games = 0) => ({ id, title: id, status: 'live', games: Array.from({ length: games }, (_, n) => ({ n: n + 1 })) });
@@ -141,5 +144,28 @@ suite('Nuvem — mescla com o que chega do servidor', () => {
     assert.equal(p.stars, 3);
     assert.deepEqual(p.positions, ['D', 'M']);
     assert.deepEqual(playerToRow({ ...p, type: 'gk' }).positions, [], 'goleiro vai sem posições');
+  });
+});
+
+suite('Nuvem — sinal caiu depois de a nuvem gravar (auditoria 2026-11-21)', () => {
+  test('JSON canônico: a ordem das chaves (jsonb do Postgres) não muda a comparação', () => {
+    const a = { id: 's1', teams: { t2: { line: [1, 2] }, t1: { gks: [] } }, x: undefined, games: [{ n: 1, r: 'A' }] };
+    const b = { games: [{ r: 'A', n: 1 }], teams: { t1: { gks: [] }, t2: { line: [1, 2] } }, id: 's1' };
+    assert.equal(stableStringify(a), stableStringify(b));
+    assert.equal(stateFingerprint(a), stateFingerprint(b));
+    assert.ok(stateFingerprint(a) !== stateFingerprint({ ...b, games: [{ r: 'B', n: 1 }] }), 'conteúdo diferente, impressão diferente');
+    assert.ok(stableStringify([2, 1]) !== stableStringify([1, 2]), 'ordem de listas importa');
+  });
+
+  test('Nuvem igual a um envio nosso sem resposta: não é conflito; nuvem diferente: conflito de verdade', () => {
+    const sent1 = { id: 's1', status: 'live', removed: ['A'] };
+    const sent2 = { id: 's1', status: 'live', removed: ['A', 'B'] }; // mexeu de novo antes do reenvio
+    const fps = [stateFingerprint(sent1), stateFingerprint(sent2)];
+    const cloud = JSON.parse(JSON.stringify({ removed: ['A'], status: 'live', id: 's1' })); // como volta do jsonb
+    assert.ok(isOwnLostWrite(fps, cloud), 'a nuvem tem o 1º envio, cuja resposta se perdeu');
+    assert.ok(isOwnLostWrite(stateFingerprint(sent1), cloud), 'aceita uma impressão só (formato antigo)');
+    assert.ok(!isOwnLostWrite(fps, { id: 's1', status: 'live', removed: ['Z'] }), 'outro admin gravou: conflito real');
+    assert.ok(!isOwnLostWrite([], cloud));
+    assert.ok(!isOwnLostWrite(fps, null));
   });
 });
