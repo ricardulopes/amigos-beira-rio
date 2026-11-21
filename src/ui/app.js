@@ -6,7 +6,7 @@ import { renderModal } from './modals.js';
 import { esc } from './dom.js';
 import {
   validatePlayer, snapshotPlayer, playerDraft, togglePosition, prepareDraw, clampLinePerTeam, clampTolerance, clampTransferQty,
-  createSession, redraw, startSession, finishSession, analyzeResult, registerResult, addLatePlayer, removePlayer,
+  createSession, redraw, startSession, finishSession, clockOf, resolveFinishTime, analyzeResult, registerResult, addLatePlayer, removePlayer,
   transferPlayers, movePlayerInOrder, swapPlayers, moveGoalkeeper, moveGoalkeeperInLineup, setPermanence, RuleError,
   goalkeeperOrder, moveInGoalkeeperOrder, goalkeeperLineup,
   shareText, validatePinFormat, parseRoster, planRosterImport, applyRosterImport, rosterPlanSummary,
@@ -640,22 +640,26 @@ const actions = {
     app.ui.lastExplanation = null;
     toast(`Desfeito: ${item.label}.`, 'ok');
   },
-  finish: () =>
-    openModal('confirm', {
-      title: 'Encerrar pelada',
-      text: 'Encerrar a sequência de jogos? Ela ficará salva no histórico.',
-      okText: 'Encerrar',
-      danger: true,
-      onOk: () => {
-        const s = activeSession();
-        replaceSession(finishSession(s));
-        app.db.activeSessionId = null;
-        store.clearUndo(s.id);
-        save();
-        app.ui.modal = null;
-        navigate(`/historico/${s.id}`);
-      },
-    }),
+  // RN-146: encerrar pede o horário de encerramento; o campo começa VAZIO (nada pré-selecionado).
+  finish: () => openModal('finish', { time: '' }),
+  'finish-now': () => {
+    app.ui.modal.time = clockOf(new Date().toISOString());
+    render();
+  },
+  'finish-ok': () => {
+    const s = activeSession();
+    try {
+      const at = resolveFinishTime(s, app.ui.modal.time);
+      replaceSession(finishSession(s, at));
+    } catch (e) {
+      return toast(e instanceof RuleError ? e.message : `Não foi possível encerrar: ${e.message}`, 'error', 5000);
+    }
+    app.db.activeSessionId = null;
+    store.clearUndo(s.id);
+    save();
+    app.ui.modal = null;
+    navigate(`/historico/${s.id}`);
+  },
   'confirm-ok': () => app.ui.modal.onOk(),
 
   // ---------- compartilhar

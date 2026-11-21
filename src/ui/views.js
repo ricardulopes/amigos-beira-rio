@@ -512,7 +512,7 @@ export function historyDetailView(id) {
   }
   return `${header(s.title, { back: '/historico' })}
   <main class="page">
-    <p class="muted small">${new Date(s.createdAt).toLocaleString('pt-BR', { dateStyle: 'full', timeStyle: 'short' })}${s.finishedAt ? ` · encerrada às ${new Date(s.finishedAt).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}` : ''}</p>
+    <p class="muted small">${new Date(s.createdAt).toLocaleString('pt-BR', { dateStyle: 'full', timeStyle: 'short' })}${s.startedAt ? ` · início às ${new Date(s.startedAt).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}` : ''}${s.finishedAt ? ` · encerrada às ${new Date(s.finishedAt).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}` : ''}</p>
     <div class="chips scroll-x">${t('games', 'Jogos')}${t('draw', 'Sorteio')}${t('log', 'Movimentações')}${t('players', 'Desempenho')}${t('people', 'Participantes')}</div>
     ${body}
     ${s.status === 'finished' ? `<button class="btn danger-ghost wide" data-act="delete-session" data-id="${s.id}">Excluir do histórico</button>` : ''}

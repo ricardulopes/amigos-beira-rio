@@ -32,6 +32,7 @@ export { LIMITS, clampLinePerTeam, clampTolerance, clampTransferQty, planPartici
   goalkeeperOrder, moveInGoalkeeperOrder, goalkeeperPreview } from './setup.js';
 export {
   DEFAULT_CONFIG, RuleError, createSession, redraw, startSession, finishSession,
+  KICKOFF_DELAY_MIN, MAX_PELADA_HOURS, kickoffTime, clockOf, resolveFinishTime,
   teamPids, linePositions, positionOf, label, isComplete, queueLabel, player, teamStats, lineStarsRef, allTeamsInOrder, validate,
   usesGkQueue, goalkeeperLineup, goalkeeperPlaces,
 } from './session.js';

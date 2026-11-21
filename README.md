@@ -104,6 +104,9 @@ será zerado antes do ciclo oficial.
   Goleiros não têm botões (isentos).
 - A chamada não "pula": marcar presença, pagamento ou ordem dos goleiros atualiza só o item tocado, que fica parado sob o dedo.
   O aviso "⏳ Salvando…" é um selo flutuante abaixo do cabeçalho e não empurra a tela.
+- **Horários:** ao tocar em Sortear, o início oficial da pelada é a hora do celular + 3 minutos. Para encerrar, a janela
+  pede o horário de encerramento (campo vazio; o botão "Usar horário atual" preenche se for agora) e só encerra depois
+  que você confirma.
 - **Admin (PIN mestre):** **Caixa do dia** (marcar Pix, Cartão, Dinheiro ou Isento de cada atleta, com o **fechamento de
   caixa**: atletas e valor por forma, pendentes com nomes e soma geral conferida com o esperado; atalho
   "💰 Pagamentos" no sorteio e em "⋯ Mais" na partida), **Aportes** e, em **Ajustes → Financeiro e Pix**,

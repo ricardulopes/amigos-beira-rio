@@ -24,6 +24,16 @@ export function renderModal() {
   switch (m.type) {
     case 'player':
       return playerForm(m);
+    case 'finish': {
+      // RN-146: campo de horário começa vazio; "Usar horário atual" é só um atalho opcional.
+      const s = activeSession();
+      const start = s?.startedAt ? new Date(s.startedAt).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : null;
+      return shell('Encerrar pelada', `<p>A sequência de jogos ficará salva no histórico${s ? ` (${s.games.length} jogo(s)${start ? `, início às ${start}` : ''})` : ''}.</p>
+        <label class="field"><span>Horário de encerramento</span><input id="m-finish" type="time" data-input="m:time" value="${esc(m.time || '')}" required></label>
+        <button class="btn wide" data-act="finish-now">🕒 Usar horário atual</button>
+        <p class="muted small">Confira o horário antes de encerrar. Se estiver encerrando depois, digite a hora em que o último jogo terminou.</p>`,
+      `<button class="btn" data-act="modal-close">Cancelar</button><button class="btn danger" data-act="finish-ok">Encerrar</button>`);
+    }
     case 'confirm':
       return shell(m.title, `<p>${m.html || esc(m.text)}</p>`, `<button class="btn" data-act="modal-close">Cancelar</button><button class="btn ${m.danger ? 'danger' : 'primary'}" data-act="confirm-ok">${esc(m.okText || 'Confirmar')}</button>`);
     case 'result':

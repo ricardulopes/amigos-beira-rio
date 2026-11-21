@@ -513,6 +513,14 @@ completam o 5º time; os dois seguintes abrem o 6º; o quinto atrasado entra no 
   no máximo duas em campo; goleiros só em vaga de goleiro e linha só em vaga de linha.
 - **RN-85** Desfazer: restaura exatamente o estado anterior da última operação (até 40 passos por pelada).
 - **RN-86** Encerrar pelada: move para o histórico (status encerrada) e libera um novo sorteio.
+- **RN-145 — Início no sorteio + 3 min** *(2026-11-21)*. Ao tocar em **Sortear**, o app grava como início oficial da pelada o
+  horário do aparelho **mais 3 minutos** (`kickoffAt`), tempo de ajeitar a chuteira e entrar em campo. Refazer o sorteio
+  recalcula. Ao começar a pelada, `startedAt` recebe esse horário (rascunho antigo sem ele usa a hora do início).
+  Datas de presença/ranking usam esse início; o histórico mostra "início às HH:MM".
+- **RN-146 — Encerramento com horário confirmado** *(2026-11-21)*. "Encerrar pelada" abre uma janela com o campo
+  **Horário de encerramento vazio** (nada pré-selecionado) e o atalho opcional **"Usar horário atual"**. Sem horário,
+  não encerra. O horário vira data a partir do início (antes do início = passou da meia-noite); horário no futuro
+  ou pelada com mais de 12 h são recusados com aviso. O registro guarda "Pelada encerrada às HH:MM".
 
 ---
 
@@ -767,7 +775,7 @@ Proteções da auditoria de ponto cego (pedido do dono em 2026-11-20):
 
 ---
 
-## 18. Testes automatizados (cobertura atual: 194 testes)
+## 18. Testes automatizados (cobertura atual: 197 testes)
 
 Executar em `tests/index.html` (navegador) ou `node tests/run-node.mjs`.
 

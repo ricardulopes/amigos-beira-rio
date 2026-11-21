@@ -49,7 +49,7 @@ export function makeTeam(s, { line = [], gks = [], origin = 'draw', note = '' } 
  * Cria a sessão (pelada) a partir de um resultado de sorteio.
  * @param {{title, config, snapshots: Record<string,object>, draw, scheduledAt?, id?}} p
  */
-export function createSession({ title, config, snapshots, draw, gkOrder = [], scheduledAt = null, id, payments = {} }) {
+export function createSession({ title, config, snapshots, draw, gkOrder = [], scheduledAt = null, id, payments = {}, drawnAt = nowIso() }) {
   const s = {
     id: id || newId('s'),
     title: title || 'Pelada',
@@ -74,6 +74,7 @@ export function createSession({ title, config, snapshots, draw, gkOrder = [], sc
     seq: 0,
     gkQueue: [],
     payments: { ...payments }, // RN-139: pagamentos marcados na chamada antes do sorteio
+    kickoffAt: kickoffTime(drawnAt), // RN-145: início oficial = sorteio + 3 min
   };
   applyDraw(s, draw, gkOrder);
   validate(s);
@@ -104,9 +105,10 @@ function applyDraw(s, draw, gkOrder = []) {
 }
 
 /** Refaz o sorteio de uma pelada ainda não iniciada (RN-38, RN-40). */
-export function redraw(state, { draw, config, snapshots, gkOrder, payments }) {
+export function redraw(state, { draw, config, snapshots, gkOrder, payments, drawnAt = nowIso() }) {
   if (state.games.length) throw new RuleError('Não é possível sortear de novo depois que a pelada começou.');
   const s = clone(state);
+  s.kickoffAt = kickoffTime(drawnAt); // RN-145: cada novo sorteio recalcula o início
   if (config) s.config = { ...s.config, ...config };
   if (snapshots) s.snapshot = clone(snapshots);
   if (payments) s.payments = { ...payments };
@@ -123,18 +125,23 @@ export function startSession(state) {
   if (s.status !== 'draft') return s;
   if (s.field.length < 2) throw new RuleError('São necessárias ao menos duas equipes para começar.');
   s.status = 'live';
-  s.startedAt = nowIso();
+  s.startedAt = s.kickoffAt || nowIso(); // RN-145: o início oficial é o do sorteio + 3 min
   syncGoalkeepers(s); // rascunho em formato anterior: goleiro que aguardava vai para o time sem goleiro
   addLog(s, 'start', `Pelada iniciada: ${label(s, s.field[0])} x ${label(s, s.field[1])}.`);
   validate(s);
   return s;
 }
 
-export function finishSession(state) {
+/**
+ * RN-146: encerra com o horário CONFIRMADO pelo admin (ISO vindo de resolveFinishTime). Sem horário não encerra:
+ * nada é preenchido automaticamente.
+ */
+export function finishSession(state, finishedAt) {
+  if (!finishedAt || Number.isNaN(Date.parse(finishedAt))) throw new RuleError('Informe o horário de encerramento.');
   const s = clone(state);
   s.status = 'finished';
-  s.finishedAt = nowIso();
-  addLog(s, 'finish', `Pelada encerrada após ${s.games.length} jogo(s).`);
+  s.finishedAt = new Date(finishedAt).toISOString();
+  addLog(s, 'finish', `Pelada encerrada às ${clockOf(s.finishedAt)} após ${s.games.length} jogo(s).`);
   return s;
 }
 
@@ -360,4 +367,42 @@ export function removeTeam(s, tid) {
 /** Completa o campo com as primeiras da fila quando há menos de duas equipes jogando. */
 export function fillField(s) {
   while (s.field.length < 2 && s.queue.length) s.field.push(s.queue.shift());
+}
+
+// ---------------------------------------------------------------- horários (RN-145, RN-146)
+
+/** Minutos entre o toque em Sortear e o início oficial (tempo de ajeitar a chuteira e entrar em campo). */
+export const KICKOFF_DELAY_MIN = 3;
+/** Duração máxima aceita para uma pelada ao encerrar (proteção contra horário digitado errado). */
+export const MAX_PELADA_HOURS = 12;
+
+/** RN-145: início oficial = horário do sorteio + 3 minutos. */
+export function kickoffTime(drawnAt) {
+  return new Date(Date.parse(drawnAt) + KICKOFF_DELAY_MIN * 60000).toISOString();
+}
+
+/** "HH:MM" do horário local de um ISO (para o atalho "Usar horário atual"). */
+export function clockOf(iso) {
+  const d = new Date(iso);
+  return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+}
+
+/**
+ * RN-146: converte o horário de encerramento digitado ("HH:MM", obrigatório) numa data/hora, a partir do início da
+ * pelada. Antes do início = virou a meia-noite (dia seguinte). Recusa vazio, formato inválido, horário no futuro e
+ * pelada com mais de 12 h.
+ */
+export function resolveFinishTime(s, clock, now = nowIso()) {
+  const m = /^(\d{1,2}):(\d{2})$/.exec(String(clock || '').trim());
+  if (!m) throw new RuleError('Informe o horário de encerramento (ex.: 22:30).');
+  const h = Number(m[1]);
+  const min = Number(m[2]);
+  if (h > 23 || min > 59) throw new RuleError('Horário inválido.');
+  const start = new Date(s.startedAt || s.kickoffAt || s.createdAt);
+  const end = new Date(start);
+  end.setHours(h, min, 0, 0);
+  if (end < start) end.setDate(end.getDate() + 1);
+  if (end.getTime() > Date.parse(now) + 60000) throw new RuleError('O horário de encerramento não pode estar no futuro.');
+  if (end - start > MAX_PELADA_HOURS * 3600000) throw new RuleError(`A pelada teria mais de ${MAX_PELADA_HOURS} horas. Confira o horário.`);
+  return end.toISOString();
 }

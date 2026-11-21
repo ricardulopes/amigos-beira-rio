@@ -5,7 +5,7 @@ import {
   isValidStars, sumStars, mean, median, range, formatStars, starsText,
   planParticipation, goalkeeperNote, toleranceInfo, clampLinePerTeam, clampTolerance, clampTransferQty, prepareDraw, defaultTitle,
   drawHint, advantageStatus, registerResult, balanceSummary, teamExitGroups, gamesSummary,
-  playerDraft, togglePosition, RuleError, linePositions, positionOf, outGallery, drawLineup, redraw, startSession, finishSession, historyRanking, rankingSessions, gameBoard,
+  playerDraft, togglePosition, RuleError, linePositions, positionOf, outGallery, drawLineup, redraw, startSession, finishSession, historyRanking, rankingSessions, gameBoard, createSession, kickoffTime, clockOf, resolveFinishTime, KICKOFF_DELAY_MIN,
 } from '../src/domain/index.js';
 
 suite('Numeração de posições (de baixo para cima)', () => {
@@ -254,7 +254,7 @@ suite('Aba Sorteio do histórico (RN-142)', () => {
     assert.equal(s.draws.length, 2);
     s = startSession(s);
     s = R(s, 'A');
-    s = finishSession(s);
+    s = finishSession(s, new Date().toISOString());
     const d = drawLineup(s);
     assert.equal(d.total, 2);
     assert.equal(d.missing, 0);
@@ -272,7 +272,7 @@ suite('Aba Sorteio do histórico (RN-142)', () => {
       const an = analyzeResultSafe(s, r);
       s = R(s, r, an);
     }
-    s = finishSession(s);
+    s = finishSession(s, new Date().toISOString());
     assert.equal(JSON.stringify(drawLineup(s)), before);
     assert.equal(drawLineup(s).teams.length, 4);
     assert.equal(drawLineup(s).teams[3].line.length, 3);
@@ -315,7 +315,7 @@ suite('Ranking acumulado do histórico (RN-143)', () => {
     s = R(s, 'A'); // T1 (G1) vence T2 (G2)
     s = R(s, 'B'); // T3 (G3) vence T1
     s = R(s, 'draw'); // T2 x T3: desafiante T2 fica
-    s = finishSession(s);
+    s = finishSession(s, new Date().toISOString());
     return { ...s, id: `s-${iso}`, createdAt: iso, startedAt: iso };
   };
 
@@ -383,7 +383,7 @@ suite('Mural da aba Jogos do histórico (RN-144)', () => {
     let s = mkSession([5, 5, 5, 5], { goalkeepers: 4 });
     s = R(s, 'draw', { tossWinner: 't2' }); // 1º jogo: empate com par ou ímpar
     s = R(s, 'B'); // Time 4 vence o Time 3
-    const b = gameBoard(finishSession(s));
+    const b = gameBoard(finishSession(s, new Date().toISOString()));
     assert.equal(b.length, 2);
     assert.deepEqual([b[0].n, b[0].title, b[0].note], [1, 'Empate', 'par ou ímpar: Time 2']);
     assert.deepEqual(b[0].teams.map((t) => [t.label, t.kind]), [['Time 1', 'draw'], ['Time 2', 'draw']]);
@@ -426,5 +426,50 @@ suite('Mural: X só em quem saiu no empate (RN-144)', () => {
     const s = R(mkSession([5, 5, 5]), 'draw', { tossWinner: 't2' });
     delete s.games[0].leaving;
     assert.deepEqual(gameBoard(s)[0].teams.map((t) => t.kind), ['draw', 'draw']);
+  });
+});
+
+suite('Horários: início no sorteio + 3 min e encerramento confirmado (RN-145, RN-146)', () => {
+  const draw = (s) => ({ teams: Object.values(s.teams).map((t) => ({ line: t.line, gks: [] })), seed: 1, metrics: {}, ref: 2, withoutGk: [], unusedGoalkeepers: [] });
+  const local = (y, mo, d, h, mi) => new Date(y, mo - 1, d, h, mi).toISOString();
+
+  test('Sortear: início oficial = agora + 3 minutos; refazer o sorteio recalcula; começar usa esse horário', () => {
+    assert.equal(KICKOFF_DELAY_MIN, 3);
+    assert.equal(kickoffTime(local(2026, 11, 21, 20, 0)), local(2026, 11, 21, 20, 3));
+    assert.equal(kickoffTime(local(2026, 11, 21, 23, 58)), local(2026, 11, 22, 0, 1), 'vira o dia');
+    const base = mkSession([5, 5]);
+    let s = createSession({ title: 'X', config: base.config, snapshots: base.snapshot, draw: draw(base), drawnAt: local(2026, 11, 21, 20, 0) });
+    assert.equal(s.kickoffAt, local(2026, 11, 21, 20, 3));
+    assert.equal(s.startedAt, null, 'rascunho ainda não começou');
+    s = redraw(s, { draw: draw(base), drawnAt: local(2026, 11, 21, 20, 10) });
+    assert.equal(s.kickoffAt, local(2026, 11, 21, 20, 13), 'novo sorteio, novo início');
+    s = startSession(s);
+    assert.equal(s.startedAt, local(2026, 11, 21, 20, 13), 'início oficial é o do sorteio + 3 min');
+  });
+
+  test('Encerrar exige horário confirmado: sem valor (vazio/nulo) não encerra; nada é pré-preenchido', () => {
+    const s = { ...mkSession([5, 5]), startedAt: local(2026, 11, 21, 20, 3) };
+    assert.throws(() => finishSession(s), /horário de encerramento/);
+    assert.throws(() => finishSession(s, ''), /horário de encerramento/);
+    assert.throws(() => finishSession(s, 'lixo'), /horário de encerramento/);
+    assert.throws(() => resolveFinishTime(s, '', local(2026, 11, 21, 23, 0)), /Informe o horário/);
+    assert.throws(() => resolveFinishTime(s, null, local(2026, 11, 21, 23, 0)), /Informe o horário/);
+    assert.throws(() => resolveFinishTime(s, '25:00', local(2026, 11, 21, 23, 0)), /inválido/);
+    assert.equal(s.status, 'live', 'tentativas recusadas não mudam a pelada');
+  });
+
+  test('Horário digitado vira data/hora a partir do início; meia-noite; futuro e mais de 12 h são recusados', () => {
+    const s = { ...mkSession([5, 5]), startedAt: local(2026, 11, 21, 20, 3) };
+    const now = local(2026, 11, 22, 0, 40);
+    assert.equal(resolveFinishTime(s, '22:30', now), local(2026, 11, 21, 22, 30));
+    assert.equal(resolveFinishTime(s, '00:15', now), local(2026, 11, 22, 0, 15), 'depois da meia-noite = dia seguinte');
+    assert.throws(() => resolveFinishTime(s, '00:50', now), /futuro/);
+    const s2 = { ...s, startedAt: local(2026, 11, 21, 8, 0) };
+    assert.throws(() => resolveFinishTime(s2, '21:00', local(2026, 11, 21, 23, 0)), /12 horas/);
+    const done = finishSession(s, resolveFinishTime(s, '22:30', now));
+    assert.equal(done.status, 'finished');
+    assert.equal(done.finishedAt, local(2026, 11, 21, 22, 30));
+    assert.ok(done.log.some((x) => /encerrada às 22:30/.test(x.text)));
+    assert.equal(clockOf(local(2026, 11, 21, 7, 5)), '07:05', 'atalho "Usar horário atual" preenche HH:MM');
   });
 });
