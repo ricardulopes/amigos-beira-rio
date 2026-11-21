@@ -5,7 +5,7 @@ import {
   isValidStars, sumStars, mean, median, range, formatStars, starsText,
   planParticipation, goalkeeperNote, toleranceInfo, clampLinePerTeam, clampTolerance, clampTransferQty, prepareDraw, defaultTitle,
   drawHint, advantageStatus, registerResult, balanceSummary, teamExitGroups, gamesSummary,
-  playerDraft, togglePosition, RuleError, linePositions, positionOf, outGallery, drawLineup, redraw, startSession, finishSession, historyRanking, rankingSessions,
+  playerDraft, togglePosition, RuleError, linePositions, positionOf, outGallery, drawLineup, redraw, startSession, finishSession, historyRanking, rankingSessions, gameBoard,
 } from '../src/domain/index.js';
 
 suite('Numeração de posições (de baixo para cima)', () => {
@@ -373,5 +373,39 @@ suite('Ranking acumulado do histórico (RN-143)', () => {
     assert.equal(pres.rows[pres.rows.length - 1].pid, 'LATE', 'quem veio a menos peladas fica embaixo');
     assert.equal(JSON.stringify(s2), before, 'leitura pura');
     assert.deepEqual(historyRanking([]).rows, []);
+  });
+});
+
+suite('Mural da aba Jogos do histórico (RN-144)', () => {
+  const R = (s, r, o) => registerResult(s, r, o).state;
+
+  test('Cada jogo traz os dois times: vencedor limpo, perdedor vermelho; empate: os dois turquesa', () => {
+    let s = mkSession([5, 5, 5, 5], { goalkeepers: 4 });
+    s = R(s, 'draw', { tossWinner: 't2' }); // 1º jogo: empate com par ou ímpar
+    s = R(s, 'B'); // Time 4 vence o Time 3
+    const b = gameBoard(finishSession(s));
+    assert.equal(b.length, 2);
+    assert.deepEqual([b[0].n, b[0].title, b[0].note], [1, 'Empate', 'par ou ímpar: Time 2']);
+    assert.deepEqual(b[0].teams.map((t) => [t.label, t.kind]), [['Time 1', 'draw'], ['Time 2', 'draw']]);
+    assert.deepEqual([b[1].title, b[1].note], ['Vitória Time 4', '']);
+    assert.deepEqual(b[1].teams.map((t) => [t.label, t.kind]), [['Time 3', 'loss'], ['Time 4', 'win']]);
+    const t4 = b[1].teams[1];
+    assert.equal(t4.vest, 'blue');
+    assert.equal(t4.gks.length, 1, 'goleiro do jogo');
+    assert.equal(t4.line.length, 5);
+    assert.deepEqual(t4.line.map((x) => x.position), [5, 4, 3, 2, 1]);
+    assert.equal(t4.sum, 10);
+  });
+
+  test('Empate em que um time fica: os dois aparecem como empate; retrato não muda com o rodízio', () => {
+    let s = mkSession([5, 5, 5, 2]);
+    s = R(s, 'A');
+    s = R(s, 'draw'); // desafiante fica
+    const first = JSON.stringify(gameBoard(s)[0]);
+    s = R(s, 'A');
+    s = R(s, 'B');
+    assert.deepEqual(gameBoard(s)[1].teams.map((t) => t.kind), ['draw', 'draw']);
+    assert.equal(JSON.stringify(gameBoard(s)[0]), first);
+    assert.deepEqual(gameBoard({ games: [] }), []);
   });
 });

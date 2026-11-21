@@ -541,6 +541,12 @@ completam o 5º time; os dois seguintes abrem o 6º; o quinto atrasado entra no 
   (cadastro da pelada mais recente). O app não registra gols, então não há artilharia nem gols sofridos (decisão do
   dono). Filtros: Geral, Este semestre, Últimos 30 dias; ordenar por Pontos, Aproveitamento ou Presença. No
   aproveitamento, quem tem menos de 3 jogos fica abaixo dos demais (aparece esmaecido). Cálculo em `historyRanking`.
+- **RN-144 — Aba Jogos do histórico em mural** *(2026-11-21)*. Os textos técnicos de cada jogo saíram dessa aba (continuam
+  em "Movimentações"). Cada jogo vira um **quadrante** com "Jogo N" e o desfecho curto ("Vitória Time X", "Empate" e,
+  no 1º jogo, quem venceu o par ou ímpar) e as miniaturas dos **dois times** como jogaram (retrato do apito: colete,
+  estrelas, goleiro, G/D/M/A, nomes e estrelas). 2 quadrantes por linha = 4 miniaturas na largura do celular.
+  Vencedor: limpo, borda azul; perdedor: borda e X vermelhos; empate: os dois com borda e X turquesa (mesmo quando um
+  time ficou em campo). Nomes não são cortados: quebram só entre palavras. Cálculo em `gameBoard` (domínio).
 
 ---
 
@@ -753,7 +759,7 @@ Proteções da auditoria de ponto cego (pedido do dono em 2026-11-20):
 
 ---
 
-## 18. Testes automatizados (cobertura atual: 189 testes)
+## 18. Testes automatizados (cobertura atual: 191 testes)
 
 Executar em `tests/index.html` (navegador) ou `node tests/run-node.mjs`.
 

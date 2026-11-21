@@ -518,3 +518,22 @@ button.tile { text-align: left; font: inherit; width: 100%; cursor: pointer; }
 .rk-table .ved { letter-spacing: -.02em; }
 .rk-table tr.few td { opacity: .55; }
 .rk-table tbody tr:nth-child(-n+3) .pos { color: var(--brand-fg); }
+
+/* RN-144: aba Jogos do histórico — 2 quadrantes por linha, cada um com os 2 times (4 miniaturas na largura) */
+.board { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; margin-top: 6px; }
+.quad { min-width: 0; background: var(--surface-2); border: 1px solid var(--line); border-radius: 10px; padding: 4px; }
+.quad > header { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0 4px; font-size: 10.5px; line-height: 1.3; margin: 0 2px 4px; }
+.quad > header b { font-size: 11px; }
+.quad > header span { font-weight: 700; color: var(--brand-fg); }
+.quad > header small { flex-basis: 100%; color: var(--muted); font-size: 9.5px; }
+.quad-teams { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 3px; }
+.mini.k-win { border-color: var(--brand-fg); }
+/* no histórico, nome inteiro: o texto corre na linha (letra, nome, estrelas) e só quebra entre palavras */
+.quad .mini li { display: block; line-height: 1.2; padding: 1px 0; }
+.quad .mini .rl { display: inline-grid; vertical-align: -2px; margin-right: 2px; }
+.quad .mini .mn { display: inline; white-space: normal; overflow: visible; overflow-wrap: break-word; }
+.quad .mini .ms { margin-left: 3px; font-size: 9px; white-space: nowrap; }
+.quad .mini { padding: 3px 3px 2px; font-size: 9px; }
+.quad .mini .rl { width: 11px; height: 11px; font-size: 7.5px; margin-right: 1px; }
+.quad-teams { gap: 2px; }
+.quad { padding: 3px; }

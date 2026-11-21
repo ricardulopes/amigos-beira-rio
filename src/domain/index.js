@@ -43,7 +43,7 @@ export { removePlayer } from './removals.js';
 export { simulateTransfer, transferPlayers, movePlayerInOrder, swapPlayers, moveGoalkeeper, moveGoalkeeperInLineup, setPermanence } from './adjustments.js';
 export { balanceWarnings, BALANCE_THRESHOLDS } from './balance.js';
 export {
-  playerStats, balanceSummary, gamesSummary, teamExitGroups, outGallery, drawLineup,
+  playerStats, balanceSummary, gamesSummary, teamExitGroups, outGallery, gameBoard, drawLineup,
   RANKING_PERIODS, RANKING_SORTS, RANKING_MIN_GAMES, rankingSessions, historyRanking,
 } from './stats.js';
 export { shareText } from './share.js';

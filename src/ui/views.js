@@ -5,7 +5,7 @@ import { cloud, adminUntil } from '../cloud/sync.js';
 import {
   filterPlayers, ROLE_NAMES, REMOVAL_REASONS, STAR_VALUES, LIMITS, planParticipation, toleranceInfo, defaultTitle as domainDefaultTitle,
   ADMIN_ACTIONS, PUBLIC_ACTIONS, allTeamsInOrder, queueLabel, teamStats, isComplete, linePositions, playerStats, balanceSummary, gamesSummary, teamExitGroups, drawHint, advantageStatus,
-  vestOf, vestName, incomingVest, outGallery, drawLineup, historyRanking, RANKING_PERIODS, RANKING_SORTS, RANKING_MIN_GAMES,
+  vestOf, vestName, incomingVest, outGallery, gameBoard, drawLineup, historyRanking, RANKING_PERIODS, RANKING_SORTS, RANKING_MIN_GAMES,
   financeSettings, cyclesAvailable, cycleRanking, cycleList, NEXT_CYCLE, statement, paymentSummary, formatMoney, PAYMENT_METHODS, FINANCE_RULES,
   CALL_PAYMENT_METHODS, callPaymentOf, cashReport,
   groupCashback, closedCycleOf, reopenInfo, financeAthletes, usesGkQueue, goalkeeperPreview,
@@ -385,6 +385,19 @@ export function liveView(s) {
   </main>`;
 }
 
+/** Miniatura de um time num jogo (RN-141/RN-144). Perdeu: X vermelho; empate: X turquesa; venceu: limpo. */
+function miniCard(m) {
+  const rows = (app.ui.inverted ? m.line.slice().reverse() : m.line)
+    .map((x) => `<li><span class="rl role-${x.role}">${esc(x.role || '?')}</span><span class="mn">${esc(x.name)}</span><span class="ms">${fmt(x.stars)}</span></li>`).join('');
+  const gk = m.gks.map((x) => `<li class="mgk"><span class="rl role-G">G</span><span class="mn">${esc(x.name)}</span><span class="ms">${fmt(x.stars)}</span></li>`).join('');
+  return `<article class="mini k-${m.kind} ${m.vest ? `v-${m.vest}` : ''}" aria-label="${esc(`Jogo ${m.game}: ${m.label}${m.outcome ? ` — ${m.outcome}` : ''}`)}">
+      <header><b>${esc(m.label)}</b><span class="msum">${m.vest ? vestIcon(m.vest, 'sm') : ''}${fmt(m.sum)}★</span></header>
+      <ul>${gk}${rows}</ul>
+      ${m.outcome ? `<span class="mtag">${esc(m.outcome)}</span>` : ''}
+      ${m.kind === 'win' ? '' : '<span class="mx" aria-hidden="true"></span>'}
+    </article>`;
+}
+
 /** RN-141: miniaturas dos times que saíram (derrota = X vermelho, empate = X turquesa), 4 por linha. */
 const GALLERY_RECENT = 8;
 function outGalleryBlock(s) {
@@ -392,21 +405,20 @@ function outGalleryBlock(s) {
   if (!all.length) return '';
   const showAll = app.ui.galleryAll || all.length <= GALLERY_RECENT;
   const list = showAll ? all : all.slice(-GALLERY_RECENT);
-  const mini = (m) => {
-    const rows = (app.ui.inverted ? m.line.slice().reverse() : m.line)
-      .map((x) => `<li><span class="rl role-${x.role}">${esc(x.role || '?')}</span><span class="mn">${esc(x.name)}</span><span class="ms">${fmt(x.stars)}</span></li>`).join('');
-    const gk = m.gks.map((x) => `<li class="mgk"><span class="rl role-G">G</span><span class="mn">${esc(x.name)}</span><span class="ms">${fmt(x.stars)}</span></li>`).join('');
-    return `<article class="mini k-${m.kind} ${m.vest ? `v-${m.vest}` : ''}" aria-label="${esc(`Jogo ${m.game}: ${m.label} — ${m.outcome}`)}">
-      <header><b>${esc(m.label)}</b><span class="msum">${m.vest ? vestIcon(m.vest, 'sm') : ''}${fmt(m.sum)}★</span></header>
-      <ul>${gk}${rows}</ul>
-      <span class="mtag">${esc(m.outcome)}</span>
-      <span class="mx" aria-hidden="true"></span>
-    </article>`;
-  };
   return `<section class="outs-wrap" aria-label="Times que saíram">
-    <div class="outs">${list.map(mini).join('')}</div>
+    <div class="outs">${list.map((m) => miniCard(m)).join('')}</div>
     ${all.length > GALLERY_RECENT ? `<button class="link small" data-act="toggle-gallery">${showAll ? `Mostrar só os ${GALLERY_RECENT} últimos` : `Ver todos os ${all.length} times que saíram`}</button>` : ''}
   </section>`;
+}
+
+/** RN-144: aba Jogos do histórico — um quadrante por jogo com os dois times (2 quadrantes = 4 miniaturas por linha). */
+function gameBoardHtml(s) {
+  const board = gameBoard(s);
+  if (!board.length) return '';
+  return `<div class="board">${board.map((g) => `<section class="quad" aria-label="${esc(`Jogo ${g.n}: ${g.title}`)}">
+      <header><b>Jogo ${g.n}</b><span>${esc(g.title)}</span>${g.note ? `<small>${esc(g.note)}</small>` : ''}</header>
+      <div class="quad-teams">${g.teams.map((m) => miniCard(m)).join('')}</div>
+    </section>`).join('')}</div>`;
 }
 
 export function gameLine(g) {
@@ -469,7 +481,7 @@ export function historyDetailView(id) {
   let body = '';
   if (tab === 'games') {
     const gs = gamesSummary(s);
-    body = `<p class="muted small">${gs.games} jogos · ${gs.wins} vitórias · ${gs.draws} empates</p>` + (s.games.map((g) => `<div class="card small">${gameLine(g)}</div>`).join('') || '<p class="muted">Nenhum jogo registrado.</p>');
+    body = `<p class="muted small">${gs.games} jogos · ${gs.wins} vitórias · ${gs.draws} empates</p>` + (gameBoardHtml(s) || '<p class="muted">Nenhum jogo registrado.</p>');
   } else if (tab === 'draw') {
     // RN-142: mostra o sorteio que valeu (o último), com o retrato congelado e recuperação pelos jogos.
     const d = drawLineup(s);

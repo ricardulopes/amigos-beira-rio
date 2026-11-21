@@ -73,6 +73,42 @@ export function gamesSummary(s) {
   return { games: s.games.length, wins, draws: s.games.length - wins };
 }
 
+/** Miniatura de um time no retrato salvo do jogo (RN-141/RN-144): colete, estrelas, goleiro e linha. */
+function miniTeam(g, t, kind, outcome) {
+  return {
+    key: `${g.n}-${t.id}`,
+    game: g.n,
+    kind,
+    id: t.id,
+    label: t.label,
+    vest: t.vest || null,
+    outcome,
+    sum: sumStars(t.line),
+    gks: (t.gks || []).map((x) => ({ name: x.name, stars: x.stars })),
+    // topo primeiro (como no card); posição contada de baixo para cima (RN-33a)
+    line: t.line.map((x, i) => ({ name: x.name, stars: x.stars, role: x.role, position: t.line.length - i })),
+  };
+}
+
+/**
+ * RN-144: mural da aba Jogos do histórico — um quadrante por jogo com os DOIS times como jogaram (retrato do apito).
+ * Vencedor: 'win' (limpo); perdedor: 'loss' (vermelho); empate: os dois 'draw' (turquesa), mesmo que um tenha ficado.
+ */
+export function gameBoard(s) {
+  return (s.games || []).filter((g) => g.teamA && g.teamB).map((g) => {
+    const draw = g.result === 'draw';
+    const winner = g.result === 'A' ? g.teamA : g.result === 'B' ? g.teamB : null;
+    const kind = (t) => (draw ? 'draw' : t === winner ? 'win' : 'loss');
+    const tossBy = g.toss ? [g.teamA, g.teamB].find((t) => t.id === g.toss)?.label : null;
+    return {
+      n: g.n,
+      title: draw ? 'Empate' : `Vitória ${winner.label}`,
+      note: tossBy ? `par ou ímpar: ${tossBy}` : '',
+      teams: [g.teamA, g.teamB].map((t) => miniTeam(g, t, kind(t), '')),
+    };
+  });
+}
+
 /**
  * RN-141: galeria dos times que saíram de campo por derrota ou empate, em ordem cronológica.
  * Usa o retrato salvo no jogo (`game.teamA/teamB`, tirado no apito, antes de qualquer movimentação), então a
@@ -90,19 +126,7 @@ export function outGallery(s) {
       const left = Array.isArray(g.leaving) ? g.leaving.includes(t.label) : winner ? t !== winner : true;
       if (!left || t === winner) continue;
       const kind = g.result === 'draw' ? 'draw' : 'loss';
-      out.push({
-        key: `${g.n}-${t.id}`,
-        game: g.n,
-        kind,
-        id: t.id,
-        label: t.label,
-        vest: t.vest || null,
-        outcome: kind === 'loss' ? `Perdeu p/ ${other.label}` : `Empatou c/ ${other.label}`,
-        sum: sumStars(t.line),
-        gks: t.gks.map((x) => ({ name: x.name, stars: x.stars })),
-        // topo primeiro (como no card); posição contada de baixo para cima (RN-33a)
-        line: t.line.map((x, i) => ({ name: x.name, stars: x.stars, role: x.role, position: t.line.length - i })),
-      });
+      out.push(miniTeam(g, t, kind, kind === 'loss' ? `Perdeu p/ ${other.label}` : `Empatou c/ ${other.label}`));
     }
   }
   return out;
