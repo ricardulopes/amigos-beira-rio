@@ -69,6 +69,12 @@ function patchRender(html) {
   const tpl = document.createElement('template');
   tpl.innerHTML = html;
   if (skeletonOf(tpl.content) !== skeletonOf(root)) return false;
+  // Âncora: a região tocada; sem toque (ex.: mudança vinda da nuvem), o primeiro item visível abaixo do cabeçalho.
+  if (!app.ui._anchor) {
+    const headerBottom = document.querySelector('.topbar')?.getBoundingClientRect().bottom ?? 0;
+    const first = [...root.querySelectorAll('[data-patch]')].find((n) => n.id !== 'cloud-bar' && n.getBoundingClientRect().top >= headerBottom);
+    if (first) app.ui._anchor = { id: first.id };
+  }
   const anchor = app.ui._anchor && document.getElementById(app.ui._anchor.id);
   const top = anchor ? anchor.getBoundingClientRect().top : null;
   for (const next of [...tpl.content.querySelectorAll('[data-patch]')]) {

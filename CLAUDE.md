@@ -138,7 +138,7 @@ tests/         harness próprio + suítes (*.test.js) + runner de navegador e de
 
 - Renderização: funções que retornam strings HTML; `render()` redesenha a tela e restaura foco,
   seleção de texto e rolagem. **Atualização local:** regiões com `id` + `data-patch` (hoje, na chamada: cada linha
-  `srow-<id>`, `gk-call`, `setup-sum`, `setup-cta`) são trocadas sozinhas quando só elas mudaram; se o resto da tela
+  `srow-<id>`, `gk-call`, `setup-sum`, `setup-cta`; em todas as telas, o selo `cloud-bar`) são trocadas sozinhas quando só elas mudaram; se o resto da tela
   mudar, o render é completo. Ao criar uma região assim, dê um `id` estável e não aninhe `data-patch`. Interações por **delegação de eventos** com `data-act` (cliques →
   tabela `actions`), `data-input` e `data-change`. Ao criar um botão, adicione a ação correspondente:
   **nenhum botão pode ficar sem funcionamento**.

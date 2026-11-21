@@ -21,7 +21,8 @@ export function header(title, { back = null, right = '' } = {}) {
     ${back ? `<button class="icon-btn" data-act="go" data-to="${back}" aria-label="Voltar">‹</button>` : `<img class="brand-logo" src="${CREST}" alt="Escudo ABR">`}
     <h1>${esc(title)}</h1>
     <div class="topbar-right">${right}</div>
-  </header>${cloudBar()}`;
+    ${cloudBar()}
+  </header>`;
 }
 
 export function tabbar() {
@@ -804,13 +805,18 @@ function cloudSection() {
     <button class="btn wide" data-act="cloud-sync">🔄 Sincronizar agora</button>`;
 }
 
-/** Aviso fino no topo quando algo da nuvem pede atenção (sem sinal, pendências, conflito). */
+/**
+ * Aviso da nuvem (sem sinal, pendências, PIN). Selo FLUTUANTE preso ao cabeçalho: não ocupa espaço na página, então
+ * aparecer/sumir nunca empurra o conteúdo. Fica sempre no DOM (vazio quando não há aviso) como região data-patch,
+ * para ser atualizado sozinho sem redesenhar a tela.
+ */
 export function cloudBar() {
   const c = cloud;
-  if (!c.online) return `<div class="cloud-bar off">📴 Sem internet${c.pending ? ` · ${c.pending} alteração(ões) aguardando sinal` : ' · dados da última sincronização'}</div>`;
-  if (c.needLogin) return '<div class="cloud-bar warn" data-act="admin-toggle">⚠️ Alterações esperando envio: toque para entrar com o PIN mestre</div>';
-  if (c.pending) return `<div class="cloud-bar">⏳ Enviando ${c.pending} alteração(ões)…</div>`;
-  return '';
+  const pill = (cls, text, act = '') => `<div id="cloud-bar" class="cloud-bar ${cls}" data-patch role="status"${act}>${text}</div>`;
+  if (!c.online) return pill('off', `📴 Sem internet${c.pending ? ` · ${c.pending} alteração(ões) aguardando sinal` : ' · dados da última sincronização'}`);
+  if (c.needLogin) return pill('warn', '⚠️ Alterações esperando envio: toque para entrar com o PIN mestre', ' data-act="admin-toggle"');
+  if (c.pending) return pill('sending', '⏳ Salvando…');
+  return '<div id="cloud-bar" class="cloud-bar" data-patch hidden></div>';
 }
 
 export { ROLE_NAMES };

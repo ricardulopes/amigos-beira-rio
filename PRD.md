@@ -751,6 +751,9 @@ Proteções da auditoria de ponto cego (pedido do dono em 2026-11-20):
 - **Tela estável na chamada** *(2026-11-21)*: marcar presença, tocar em Pix/Cartão/Dinheiro e mexer na ordem dos goleiros
   atualizam só a linha/região tocada (linhas, seção de goleiros, resumo e botão Sortear são regiões `data-patch`), sem
   recriar a página; a rolagem compensa mudanças de altura acima, então o item tocado fica parado sob o dedo.
+  Sem toque (mudança vinda da nuvem, ex.: outro admin marcando goleiros), segura o primeiro item visível. O aviso da
+  nuvem ("⏳ Salvando…", sem internet, PIN) é um **selo flutuante** preso embaixo do cabeçalho: não ocupa espaço nem
+  empurra o conteúdo ao aparecer/sumir, e não captura toques (exceto o aviso de PIN, que é clicável).
 - Identidade visual da **ABR — Amigos Beira Rio (desde 2008)**: escudo oficial (`img/escudo-abr.png`,
   fundo transparente) no cabeçalho e em destaque na tela inicial; ícones do PWA gerados do escudo
   (`tools/make-icons.ps1`). Paleta: Azul Royal `#002B7F` (cabeçalho, filtros ativos, textos fortes),
